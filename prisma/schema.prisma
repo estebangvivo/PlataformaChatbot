@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  role          String   @default("AGENT")
+  fullName      String   @map("full_name")
+  isOnline      Boolean  @default(false) @map("is_online")
+  lastSeenAt    DateTime? @map("last_seen_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  agentProfile           AgentProfile?
+  assignedConversations  Conversation[] @relation("AssignedAgent")
+  sentMessages           Message[]
+  deskEventsAsActor      DeskEvent[]    @relation("DeskEventActor")
+  deskEventsFrom         DeskEvent[]    @relation("DeskEventFrom")
+  deskEventsTo           DeskEvent[]    @relation("DeskEventTo")
+
+  @@map("users")
+}
+
+model AgentProfile {
+  id               String @id @default(cuid())
+  userId           String @unique @map("user_id")
+  department       String
+  workHours        String @map("work_hours")
+  assignedKeywords String @map("assigned_keywords")
+  roundRobinIndex  Int    @default(0) @map("round_robin_index")
+  lastAssignedAt   DateTime? @map("last_assigned_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("agent_profiles")
+}
+
+model Conversation {
+  id               String   @id @default(cuid())
+  whatsappPhone    String   @unique @map("whatsapp_phone")
+  userName         String?  @map("user_name")
+  status           String   @default("BOT")
+  assignedAgentId  String?  @map("assigned_agent_id")
+  lastMessageAt    DateTime @default(now()) @map("last_message_at")
+  lastIntent       String?  @map("last_intent")
+  botEnabled       Boolean  @default(true) @map("bot_enabled")
+  contactProfile   String?  @map("contact_profile")
+  closedAt         DateTime? @map("closed_at")
+  closeOutcome     String?  @map("close_outcome")
+  channel          String    @default("whatsapp")
+  firstBotReplyAt  DateTime? @map("first_bot_reply_at")
+  firstHumanReplyAt DateTime? @map("first_human_reply_at")
+  assignedAt       DateTime? @map("assigned_at")
+  surveyStatus     String    @default("none") @map("survey_status")
+  surveyScore      Int?      @map("survey_score")
+  surveyComment    String?   @map("survey_comment")
+  surveyedAt       DateTime? @map("surveyed_at")
+  reopenCount      Int       @default(0) @map("reopen_count")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  assignedAgent User?      @relation("AssignedAgent", fields: [assignedAgentId], references: [id])
+  messages      Message[]
+  deskEvents    DeskEvent[]
+
+  @@index([status])
+  @@index([lastMessageAt])
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String   @map("conversation_id")
+  senderType     String   @map("sender_type")
+  agentId        String?  @map("agent_id")
+  content        String
+  timestamp      DateTime @default(now())
+  whatsappId     String?  @map("whatsapp_id")
+  metadata       String?
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  agent        User?        @relation(fields: [agentId], references: [id])
+
+  @@index([conversationId, timestamp])
+  @@map("messages")
+}
+
+model DeskEvent {
+  id             String   @id @default(cuid())
+  type           String
+  conversationId String    @map("conversation_id")
+  actorUserId    String?   @map("actor_user_id")
+  fromAgentId    String?   @map("from_agent_id")
+  toAgentId      String?   @map("to_agent_id")
+  department     String?
+  intent         String?
+  outcome        String?
+  note           String?
+  source         String?
+  metadata       String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  actor          User?         @relation("DeskEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  fromAgent      User?         @relation("DeskEventFrom", fields: [fromAgentId], references: [id], onDelete: SetNull)
+  toAgent        User?         @relation("DeskEventTo", fields: [toAgentId], references: [id], onDelete: SetNull)
+
+  @@index([type, createdAt])
+  @@index([conversationId, createdAt])
+  @@index([toAgentId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@map("desk_events")
+}
+
+model KnowledgeChunk {
+  id           String   @id @default(cuid())
+  pageUrl      String   @map("page_url")
+  title        String?
+  contentChunk String   @map("content_chunk")
+  embedding    String?
+  category     String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([category])
+  @@map("knowledge_base")
+}
+
+model RoutingRule {
+  id         String  @id @default(cuid())
+  intent     String
+  keywords   String
+  department String
+  priority   Int     @default(0)
+  isActive   Boolean @default(true) @map("is_active")
+
+  @@map("routing_rules")
+}
+
+model AppSetting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+
+  @@map("app_settings")
+}

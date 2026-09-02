@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  @apply bg-paper text-ink antialiased;
+  background-image: radial-gradient(circle at 12% -8%, rgba(196, 92, 38, 0.08), transparent 32%),
+    radial-gradient(circle at 90% 0%, rgba(44, 107, 94, 0.1), transparent 28%);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #c9bfae;
+  border-radius: 999px;
+}
