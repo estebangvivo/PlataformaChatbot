@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ ok: true });
 
-  const inbound = parseWhatsAppPayload(body);
+  const inbound = await parseWhatsAppPayload(body);
   for (const message of inbound) {
     await handleInboundWhatsApp({
       phone: message.from,
@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
       text: message.text,
       whatsappId: message.whatsappId,
       channel: "whatsapp",
+      media: message.media,
     });
   }
 

@@ -72,8 +72,9 @@ export function KnowledgeView() {
         <div>
           <h1 className="font-serif text-4xl">Base de conocimiento</h1>
           <p className="max-w-2xl text-ink/60">
-            Fragmentos de regional5.com.ar. Todas las noches, a las 3:00 (Córdoba), el bot recorre el
-            sitio y se actualiza solo si algo cambió.
+            Fragmentos de regional5.com.ar. Las fichas institucionales (horario, turnos, firma
+            digital) tienen prioridad sobre el rastreo de la web. Todas las noches, a las 3:00
+            (Córdoba), el bot recorre el sitio y se actualiza solo si algo cambió.
           </p>
         </div>
         <Button onClick={ingest} disabled={loading}>
@@ -109,8 +110,13 @@ export function KnowledgeView() {
         {chunks.map((chunk) => (
           <Card key={chunk.id} className="p-4">
             <div className="mb-2 flex flex-wrap items-center gap-2">
+              {chunk.title?.startsWith("[ficha]") ? (
+                <Badge className="bg-pine text-sand">Ficha</Badge>
+              ) : (
+                <Badge className="bg-sand text-pine">Web</Badge>
+              )}
               {chunk.category ? <Badge className="bg-sand text-pine">{chunk.category}</Badge> : null}
-              <p className="font-medium">{chunk.title}</p>
+              <p className="font-medium">{chunk.title?.replace(/^\[ficha\]\s*/, "")}</p>
             </div>
             <p className="text-sm text-ink/75">{chunk.contentChunk}</p>
             <a

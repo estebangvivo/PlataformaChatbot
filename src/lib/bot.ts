@@ -2,12 +2,15 @@ import { prisma } from "./db";
 import { emitDeskNotify, hub } from "./events";
 import { answerWithRag } from "./rag";
 import { hasAi } from "./ai-providers";
-import { matchRouting, requestHandoff, wantsHuman, listDeskAgents, matchAgentChoice, formatHandoffMessage, assignToAgent } from "./routing";
+import { matchRouting, requestHandoff, wantsHuman, listDeskAgents, matchAgentChoice, formatHandoffMessage } from "./routing";
 import { converseWithAi } from "./dialogue";
-import { sendWhatsAppText } from "./whatsapp";
+import { sendWhatsAppText, sendWhatsAppMenu } from "./whatsapp";
 import { isQueryRelevant, SCOPE_REJECTION } from "./scope";
 import { DESK_EVENT, logDeskEvent } from "./desk-log";
 import { applySurveyReply } from "./survey";
+import { MENU_INTRO, MENU_OPTIONS, resolveMenuChoice } from "./menu";
+import { subscribeAgentWait } from "./waitlist";
+import { interpretUserMedia, mediaLabel, type InboundMedia } from "./media";
 import {
   composeHumanReply,
   extractFacts,
@@ -140,17 +143,29 @@ export async function handleInboundWhatsApp(params: {
   text: string;
   whatsappId?: string;
   channel?: "whatsapp" | "simulator";
+  media?: InboundMedia;
 }) {
-  const conversation = await upsertConversation(params.phone, params.name, params.channel);
+  let conversation = await upsertConversation(params.phone, params.name, params.channel);
+
+  let userText = params.text.trim();
+  let userDisplay = params.text.trim();
+  if (params.media) {
+    const interpreted = await interpretUserMedia(params.media);
+    const icon = interpreted.kind === "audio" ? "🎙️" : interpreted.kind === "image" ? "📷" : "📄";
+    userDisplay = `${icon} ${mediaLabel(interpreted.kind)}\n${interpreted.text}`;
+    userText = [params.text.trim(), interpreted.text].filter(Boolean).join("\n");
+  }
+
   await saveMessage({
     conversationId: conversation.id,
     senderType: "USER",
-    content: params.text,
+    content: userDisplay || userText || "(archivo)",
     whatsappId: params.whatsappId,
+    metadata: params.media ? { kind: "media", mime: params.media.mime } : undefined,
   });
 
   if (conversation.status === "CLOSED" && conversation.surveyStatus === "pending") {
-    const survey = await applySurveyReply(conversation.id, params.text);
+    const survey = await applySurveyReply(conversation.id, userText);
     if (survey.handled) {
       return { conversationId: conversation.id, autoReplied: true, survey: true };
     }
@@ -179,10 +194,17 @@ export async function handleInboundWhatsApp(params: {
 
   const humanMode = conversation.status === "HUMAN";
   if (humanMode) {
-    return { conversationId: conversation.id, autoReplied: false };
+    const desk = await listDeskAgents();
+    if (desk.some((agent) => agent.online)) {
+      return { conversationId: conversation.id, autoReplied: false };
+    }
+    conversation = await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { status: "BOT", botEnabled: true },
+    });
   }
 
-  const profile = extractFacts(params.text, readProfile(conversation.contactProfile));
+  const profile = extractFacts(userText, readProfile(conversation.contactProfile));
   const displayName = profile.firstName
     ? profile.locality
       ? `${profile.firstName} (${profile.locality})`
@@ -193,69 +215,104 @@ export async function handleInboundWhatsApp(params: {
     const agents = await listDeskAgents();
     const picked = chosenUserId
       ? agents.find((a) => a.userId === chosenUserId) ?? null
-      : matchAgentChoice(params.text, agents);
-    if (picked) {
-      await requestHandoff(conversation.id, reason, { agentUserId: picked.userId });
+      : matchAgentChoice(userText, agents);
+    const transferable = picked?.online ? picked : null;
+    const anyoneOnline = agents.some((a) => a.online);
+
+    if (transferable) {
+      await requestHandoff(conversation.id, reason, { agentUserId: transferable.userId });
     } else {
       await prisma.conversation.update({
         where: { id: conversation.id },
-        data: { status: "PENDING", botEnabled: true, lastIntent: reason },
-      });
-      await logDeskEvent({
-        type: DESK_EVENT.pending,
-        conversationId: conversation.id,
-        intent: reason,
-        source: "bot",
-      });
-      hub.emitEvent({
-        type: "conversation.updated",
-        payload: { conversationId: conversation.id },
+        data: { status: "BOT", botEnabled: true, lastIntent: reason },
       });
     }
-    const reply = formatHandoffMessage(agents, picked);
+
+    const reply = formatHandoffMessage(agents, transferable, {
+      unavailable: picked && !picked.online ? picked : null,
+    });
     await persistProfile(
       conversation.id,
-      { ...profile, unansweredStreak: 0, awaiting: picked ? null : "elegir_asesor" },
+      {
+        ...profile,
+        unansweredStreak: 0,
+        awaiting: transferable ? null : anyoneOnline ? "elegir_asesor" : null,
+      },
       { userName: displayName, lastIntent: reason },
     );
     await saveMessage({
       conversationId: conversation.id,
       senderType: "BOT",
       content: reply,
-      metadata: { kind: "handoff" },
+      metadata: { kind: "handoff", offered: Boolean(transferable), anyoneOnline },
     });
     await sendWhatsAppText(params.phone, reply);
+    if (!transferable) {
+      await subscribeAgentWait(conversation.id, picked?.department ?? null);
+    }
+    return Boolean(transferable);
+  }
+
+  async function sendMenu() {
+    const intro =
+      params.channel === "simulator"
+        ? `${MENU_INTRO}\n\n${MENU_OPTIONS.map((option) => `• ${option.title}`).join("\n")}`
+        : MENU_INTRO;
+    await persistProfile(conversation.id, { ...profile, unansweredStreak: 0, awaiting: null }, { userName: displayName, lastIntent: "menu" });
+    await saveMessage({
+      conversationId: conversation.id,
+      senderType: "BOT",
+      content: intro,
+      metadata: { kind: "menu" },
+    });
+    if (params.channel !== "simulator") {
+      await sendWhatsAppMenu(params.phone);
+    }
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { status: "BOT", botEnabled: true, lastIntent: "menu" },
+    });
+  }
+
+  const menuChoice = resolveMenuChoice(userText);
+  if (menuChoice?.handoff) {
+    const handed = await sendHandoff("solicitud_humana");
+    return { conversationId: conversation.id, autoReplied: true, handoff: handed };
+  }
+  if (menuChoice) {
+    userText = menuChoice.query;
+  }
+
+  const userCount = await prisma.message.count({
+    where: { conversationId: conversation.id, senderType: "USER" },
+  });
+  const asksMenu = /^(menu|menú|opciones|inicio)$/i.test(userText.trim());
+  if (!params.media && (asksMenu || (userCount <= 1 && isOnlyGreeting(userText) && !menuChoice))) {
+    await sendMenu();
+    return { conversationId: conversation.id, autoReplied: true, menu: true };
   }
 
   if (profile.awaiting === "elegir_asesor") {
     const agents = await listDeskAgents();
-    const picked = matchAgentChoice(params.text, agents);
+    const picked = matchAgentChoice(userText, agents);
     if (picked) {
-      await assignToAgent(conversation.id, picked.userId, "solicitud_humana");
-      const reply = formatHandoffMessage(agents, picked);
-      await persistProfile(conversation.id, { ...profile, awaiting: null, unansweredStreak: 0 }, { userName: displayName });
-      await saveMessage({
-        conversationId: conversation.id,
-        senderType: "BOT",
-        content: reply,
-        metadata: { kind: "handoff" },
-      });
-      await sendWhatsAppText(params.phone, reply);
-      return { conversationId: conversation.id, autoReplied: true, handoff: true };
+      const handed = await sendHandoff("solicitud_humana", picked.userId);
+      return { conversationId: conversation.id, autoReplied: true, handoff: handed };
     }
   }
 
   if (profile.awaiting === "confirmar_humano") {
-    const n = params.text.trim().toLowerCase();
-    if (/^(sí|si|dale|ok|okey|claro|derivame|derivá|deriva)\b/.test(n) || wantsHuman(params.text)) {
-      await sendHandoff("solicitud_humana");
-      return { conversationId: conversation.id, autoReplied: true, handoff: true };
+    const n = userText.trim().toLowerCase();
+    if (/^(sí|si|dale|ok|okey|claro|derivame|derivá|deriva)\b/.test(n) || wantsHuman(userText)) {
+      const handed = await sendHandoff("solicitud_humana");
+      return { conversationId: conversation.id, autoReplied: true, handoff: handed };
     }
   }
 
-  if (wantsHuman(params.text)) {
-    await sendHandoff("solicitud_humana");
-    return { conversationId: conversation.id, autoReplied: true, handoff: true };
+  if (wantsHuman(userText) || /\bcon\b.+\b(hablar|quisiera|pasame)\b|\b(hablar|pasame|quisiera)\b.+\bcon\b/i.test(userText)) {
+    const named = matchAgentChoice(userText, await listDeskAgents());
+    const handed = await sendHandoff("solicitud_humana", named?.userId);
+    return { conversationId: conversation.id, autoReplied: true, handoff: handed };
   }
 
   const recent = await prisma.message.findMany({
@@ -272,7 +329,7 @@ export async function handleInboundWhatsApp(params: {
       content: m.content,
     }));
 
-  if (!isQueryRelevant(params.text)) {
+  if (!isQueryRelevant(userText)) {
     await persistProfile(conversation.id, { ...profile, unansweredStreak: 0 }, { userName: displayName });
     await saveMessage({
       conversationId: conversation.id,
@@ -286,7 +343,7 @@ export async function handleInboundWhatsApp(params: {
       conversationId: conversation.id,
       intent: "out_of_scope",
       source: "bot",
-      note: params.text.slice(0, 200),
+      note: userText.slice(0, 200),
     });
     await prisma.conversation.update({
       where: { id: conversation.id },
@@ -295,9 +352,9 @@ export async function handleInboundWhatsApp(params: {
     return { conversationId: conversation.id, autoReplied: true, outOfScope: true };
   }
 
-  const turn = resolveTurn(params.text, profile, history);
+  const turn = resolveTurn(userText, profile, history);
   const aiReady = await hasAi();
-  const searchText = aiReady ? params.text : turn.effectiveText;
+  const searchText = aiReady ? userText : turn.effectiveText;
   const rag = await answerWithRag(searchText, {
     history,
     profileSummary: profileLabel(profile) || undefined,
@@ -306,15 +363,15 @@ export async function handleInboundWhatsApp(params: {
   if (aiReady) {
     try {
       const ai = await converseWithAi({
-        userText: params.text,
+        userText,
         history,
         profile,
         chunks: rag.sources,
       });
       if (ai?.text) {
         if (ai.handoff) {
-          await sendHandoff(ai.topic ?? "solicitud_humana");
-          return { conversationId: conversation.id, autoReplied: true, handoff: true };
+          const handed = await sendHandoff(ai.topic ?? "solicitud_humana");
+          return { conversationId: conversation.id, autoReplied: true, handoff: handed };
         }
 
         const nextProfile = {
@@ -362,7 +419,7 @@ export async function handleInboundWhatsApp(params: {
 
   const rule = await matchRouting(searchText);
   const composed = composeHumanReply({
-    userText: params.text,
+    userText,
     profile,
     ragAnswer: rag.answer,
     confidence: rag.confidence,
@@ -370,7 +427,7 @@ export async function handleInboundWhatsApp(params: {
     history,
   });
 
-  const offerHumanFallback = !rag.found && !isOnlyGreeting(params.text);
+  const offerHumanFallback = !rag.found && !isOnlyGreeting(userText);
 
   await persistProfile(conversation.id, composed.profile, {
     userName: displayName,

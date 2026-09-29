@@ -18,6 +18,11 @@ export async function GET() {
       createdAt: true,
     },
   });
+  chunks.sort((a, b) => {
+    const aFicha = a.title?.startsWith("[ficha]") ? 0 : 1;
+    const bFicha = b.title?.startsWith("[ficha]") ? 0 : 1;
+    return aFicha - bFicha;
+  });
   const lastSync = await readLastSync();
   return NextResponse.json({
     chunks,

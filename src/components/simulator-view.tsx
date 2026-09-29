@@ -4,11 +4,12 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Bot, RotateCcw, Send, Smartphone, UserRound } from "lucide-react";
+import { Bot, Paperclip, RotateCcw, Send, Smartphone, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/badge";
+import { MENU_OPTIONS } from "@/lib/menu";
 import { cn, formatPhone, initials, parseJson } from "@/lib/utils";
 
 type Message = {
@@ -34,11 +35,6 @@ const STORAGE_PHONE = "r5_sim_phone";
 const STORAGE_NAME = "r5_sim_name";
 const DEFAULT_PHONE = "5493534111222";
 const DEFAULT_NAME = "Arq. Prueba";
-const SUGGESTIONS = [
-  "¿Cuál es el horario de la Regional 5?",
-  "¿Cómo hago un trámite de matrícula?",
-  "Quiero info de cursos y capacitaciones",
-];
 
 function randomPhone() {
   const tail = String(Math.floor(100000 + Math.random() * 900000));
@@ -54,6 +50,7 @@ export function SimulatorView() {
   const [ready, setReady] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const conversationIdRef = useRef<string | null>(null);
   const phoneRef = useRef(phone);
   conversationIdRef.current = conversation?.id ?? null;
@@ -108,9 +105,9 @@ export function SimulatorView() {
     return () => es.close();
   }, [loadChat]);
 
-  async function send(message = text) {
+  async function send(message = text, media?: { mime: string; filename: string; dataBase64: string }) {
     const trimmed = message.trim();
-    if (!trimmed || sending) return;
+    if ((!trimmed && !media) || sending) return;
     const digits = phone.replace(/\D/g, "");
     if (!digits) {
       toast.error("Poné un teléfono para simular el chat");
@@ -122,7 +119,12 @@ export function SimulatorView() {
       const res = await fetch("/api/simulator", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: digits, name, text: trimmed }),
+        body: JSON.stringify({
+          phone: digits,
+          name,
+          text: trimmed,
+          media,
+        }),
       });
       const raw = await res.text();
       let data: { error?: string; conversation?: Conversation } = {};
@@ -187,7 +189,8 @@ export function SimulatorView() {
 
   const humanHold = conversation && conversation.status === "HUMAN";
   const lastBot = [...messages].reverse().find((m) => m.senderType === "BOT");
-  const lastMeta = parseJson<{ offerHuman?: boolean }>(lastBot?.metadata, {});
+  const lastMeta = parseJson<{ offerHuman?: boolean; kind?: string }>(lastBot?.metadata, {});
+  const showMenu = lastMeta.kind === "menu";
   const showSurvey =
     Boolean(conversation) && conversation?.status === "CLOSED" && conversation.surveyStatus === "pending";
   const showHumanButton =
@@ -256,16 +259,16 @@ export function SimulatorView() {
             {messages.length === 0 && !sending ? (
               <div className="mx-auto max-w-md rounded-2xl bg-white/90 p-4 text-center text-sm text-ink/70 shadow-sm">
                 <Smartphone className="mx-auto mb-2 text-pine" size={22} />
-                <p>Escribí abajo para empezar. El bot responde en este mismo chat.</p>
+                <p>Escribí, elegí una opción o adjuntá una foto, audio o PDF.</p>
                 <div className="mt-3 flex flex-wrap justify-center gap-2">
-                  {SUGGESTIONS.map((hint) => (
+                  {MENU_OPTIONS.map((option) => (
                     <button
-                      key={hint}
+                      key={option.id}
                       type="button"
-                      onClick={() => send(hint)}
+                      onClick={() => send(option.title)}
                       className="rounded-full border border-line bg-white px-3 py-1.5 text-left text-xs text-ink hover:border-moss"
                     >
-                      {hint}
+                      {option.title}
                     </button>
                   ))}
                 </div>
@@ -337,6 +340,22 @@ export function SimulatorView() {
                 </div>
               </div>
             ) : null}
+            {showMenu && !humanHold && !showSurvey ? (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {MENU_OPTIONS.map((option) => (
+                  <Button
+                    key={option.id}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={sending}
+                    onClick={() => send(option.title)}
+                  >
+                    {option.title}
+                  </Button>
+                ))}
+              </div>
+            ) : null}
             {showHumanButton ? (
               <div className="mb-2">
                 <Button type="button" size="sm" variant="outline" onClick={requestHuman} disabled={sending}>
@@ -345,6 +364,41 @@ export function SimulatorView() {
               </div>
             ) : null}
             <form onSubmit={onSubmit} className="flex gap-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*,audio/*,application/pdf"
+                className="hidden"
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (!file) return;
+                  if (file.size > 6 * 1024 * 1024) {
+                    toast.error("El archivo supera 6 MB");
+                    return;
+                  }
+                  const bytes = new Uint8Array(await file.arrayBuffer());
+                  let binary = "";
+                  bytes.forEach((b) => {
+                    binary += String.fromCharCode(b);
+                  });
+                  await send(text, {
+                    mime: file.type || "application/octet-stream",
+                    filename: file.name,
+                    dataBase64: btoa(binary),
+                  });
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                disabled={sending}
+                onClick={() => fileRef.current?.click()}
+                title="Adjuntar foto, audio o PDF"
+              >
+                <Paperclip size={16} />
+              </Button>
               <input
                 ref={inputRef}
                 value={text}

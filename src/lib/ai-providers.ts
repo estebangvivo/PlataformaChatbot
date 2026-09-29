@@ -70,9 +70,11 @@ function defaultModel(provider: AiProviderId) {
 
 const DEPRECATED_MODELS: Record<string, string> = {
   "gemini-2.5-flash": "gemini-3.6-flash",
+  "gemini-2.0-flash": "gemini-3.6-flash",
   "gemini-1.5-flash": "gemini-3.6-flash",
   "gemini-1.5-pro": "gemini-3.6-flash",
   "models/gemini-2.5-flash": "gemini-3.6-flash",
+  "models/gemini-2.0-flash": "gemini-3.6-flash",
 };
 
 function resolveModel(provider: AiProviderId, stored?: string) {
@@ -170,7 +172,7 @@ async function completeOpenAI(
   return completion.choices[0]?.message?.content?.trim() || null;
 }
 
-const GEMINI_FALLBACKS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.0-flash"];
+const GEMINI_FALLBACKS = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash"];
 
 function isBusyError(status: number, message: string) {
   const n = message.toLowerCase();
@@ -234,6 +236,7 @@ async function completeGemini(
       }
       lastError = data.error?.message ?? `Gemini HTTP ${res.status}`;
       if (isBusyError(res.status, lastError)) continue;
+      if (/no longer available|not found|not supported/i.test(lastError)) break;
       throw new Error(lastError);
     }
   }

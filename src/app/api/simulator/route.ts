@@ -35,8 +35,13 @@ export async function POST(request: Request) {
   if (error) return error;
 
   try {
-    const body = (await request.json()) as { phone?: string; name?: string; text?: string };
-    if (!body.phone || !body.text) {
+  const body = (await request.json()) as {
+    phone?: string;
+    name?: string;
+    text?: string;
+    media?: { mime: string; dataBase64: string; filename?: string; caption?: string };
+  };
+    if (!body.phone || (!body.text?.trim() && !body.media)) {
       return NextResponse.json({ error: "Faltan teléfono y mensaje" }, { status: 400 });
     }
 
@@ -44,8 +49,9 @@ export async function POST(request: Request) {
     const result = await handleInboundWhatsApp({
       phone,
       name: body.name,
-      text: body.text,
+      text: body.text ?? "",
       channel: "simulator",
+      media: body.media,
     });
 
     const conversation = await conversationByPhone(phone);

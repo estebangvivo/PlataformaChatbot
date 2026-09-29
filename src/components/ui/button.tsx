@@ -9,7 +9,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-pine text-sand hover:bg-ink",
-        clay: "bg-clay text-white hover:bg-[#a94b1d]",
+        clay: "bg-clay text-white hover:bg-[#5C2868]",
         outline: "border border-line bg-white/70 text-ink hover:bg-sand",
         ghost: "text-ink/80 hover:bg-white/60",
         danger: "bg-red-700 text-white hover:bg-red-800",

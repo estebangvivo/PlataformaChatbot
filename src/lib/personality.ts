@@ -15,6 +15,8 @@ export type ContactProfile = {
   unansweredStreak: number;
   lastTopic?: string;
   awaiting?: string | null;
+  notifyOnAgent?: boolean;
+  notifyDepartment?: string | null;
 };
 
 export const EMPTY_PROFILE: ContactProfile = {
@@ -540,5 +542,5 @@ export function handoffCopy(agentName?: string, department?: string) {
   if (agentName) {
     return `Perfecto, te dejo con ${agentName} de ${department ?? "la Regional"}. En un rato te escriben por acá. Mientras tanto, si querés ir adelantando tu nombre, matrícula o localidad, ayudás a que te atiendan más rápido.`;
   }
-  return "Dale, dejé tu consulta para que te tome alguien de Regional 5. En el horario de mesa (lun a vie 8 a 13 hs) te responden por este mismo chat.";
+  return "Ahora no hay agentes conectados. Seguí hablando conmigo y te ayudo. Cuando alguien de mesa se conecte, si hace falta te derivo.";
 }

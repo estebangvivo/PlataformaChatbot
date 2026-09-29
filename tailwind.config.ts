@@ -6,26 +6,28 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#13201D",
-        pine: "#18463F",
-        moss: "#2C6B5E",
-        clay: "#C45C26",
-        sand: "#F3EDE3",
-        paper: "#FAF7F2",
-        mist: "#E4DDD1",
-        line: "#D5CBBA",
+        ink: "#2A1233",
+        pine: "#542460",
+        moss: "#703C78",
+        clay: "#8A3F98",
+        sand: "#F4ECF7",
+        paper: "#FBF8FC",
+        mist: "#E8DCEC",
+        line: "#D7C8DE",
       },
       fontFamily: {
         sans: ["var(--font-figtree)", "system-ui", "sans-serif"],
         serif: ["var(--font-source-serif)", "Georgia", "serif"],
       },
       boxShadow: {
-        card: "0 18px 40px -28px rgba(19, 32, 29, 0.45)",
-        panel: "0 1px 0 rgba(255,255,255,0.4) inset, 0 12px 32px -20px rgba(19,32,29,0.35)",
+        card: "0 18px 40px -28px rgba(42, 18, 51, 0.45)",
+        panel: "0 1px 0 rgba(255,255,255,0.4) inset, 0 12px 32px -20px rgba(42,18,51,0.35)",
       },
       backgroundImage: {
         blueprint:
-          "linear-gradient(rgba(19,32,29,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(19,32,29,0.035) 1px, transparent 1px)",
+          "linear-gradient(rgba(42,18,51,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(42,18,51,0.045) 1px, transparent 1px)",
+        facet:
+          "linear-gradient(122deg, #5C2868 0%, #703C78 34%, #542460 62%, #6C307C 82%, #743884 100%)",
       },
       backgroundSize: {
         blueprint: "28px 28px",

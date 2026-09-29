@@ -4,12 +4,12 @@ import { LoginForm } from "@/components/login-form";
 export default function LoginPage() {
   return (
     <main className="grid min-h-screen lg:grid-cols-[1.1fr_0.9fr]">
-      <section className="relative hidden overflow-hidden bg-pine text-sand lg:flex">
-        <div className="absolute inset-0 bg-blueprint bg-blueprint opacity-30" />
+      <section className="relative hidden overflow-hidden bg-facet text-sand lg:flex">
+        <div className="absolute inset-0 bg-blueprint opacity-25" />
         <div className="relative z-10 flex flex-col justify-between p-12">
           <p className="text-xs uppercase tracking-[0.28em] text-sand/70">Colegio de Arquitectos</p>
           <div>
-            <p className="text-sm uppercase tracking-[0.22em] text-clay">Regional 5 · Villa María</p>
+            <p className="text-sm uppercase tracking-[0.22em] text-sand/80">Regional 5 · Villa María</p>
             <h1 className="mt-4 max-w-xl font-serif text-5xl leading-tight">
               Mesa de atención y chatbot institucional
             </h1>

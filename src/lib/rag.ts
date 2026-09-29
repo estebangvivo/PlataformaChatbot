@@ -97,11 +97,11 @@ function lexicalScore(query: string, chunk: string) {
     (/turno/.test(q) && /turno|asesoria/.test(c) ? 0.28 : 0) +
     (/tramite|expediente/.test(q) && /tramit|expediente/.test(c) ? 0.22 : 0) +
     (/firma digital|cidi/.test(q) && /firma digital|cidi/.test(c) ? 0.45 : 0);
+  const fichaBoost = /\[ficha\]/.test(chunk) ? 0.38 : 0;
   const junkPenalty =
     /todos los derechos reservados|iniciar sesion|dejar un comentario/.test(c) || /^[a-z]/.test(chunk.trim())
       ? 0.45
       : 0;
-  const fichaBoost = /\[ficha\]/.test(chunk) ? 0.2 : 0;
   return Math.min(
     1,
     Math.max(0, hits / Math.max(terms.length, 1) + phraseBoost + synonymBoost + fichaBoost - junkPenalty),
@@ -129,17 +129,23 @@ export async function retrieveChunks(query: string, k = 5): Promise<RetrievedChu
       queryEmbedding && stored && stored.length === queryEmbedding.length
         ? cosine(queryEmbedding, stored)
         : 0;
-    const score = queryEmbedding ? semantic * 0.72 + lexical * 0.28 : lexical;
+    const curated = Boolean(row.title?.startsWith("[ficha]"));
+    const score = (queryEmbedding ? semantic * 0.62 + lexical * 0.38 : lexical) + (curated ? 0.12 : 0);
     return {
       id: row.id,
       pageUrl: row.pageUrl,
       title: row.title,
       content: row.contentChunk,
       score,
+      curated,
     };
   });
 
-  return ranked.sort((a, b) => b.score - a.score).slice(0, k);
+  const sorted = ranked.sort((a, b) => b.score - a.score);
+  const curatedHits = sorted.filter((row) => row.curated).slice(0, 3);
+  const rest = sorted.filter((row) => !row.curated);
+  const mixed = [...curatedHits, ...rest].sort((a, b) => b.score - a.score);
+  return mixed.slice(0, k).map(({ curated: _c, ...chunk }) => chunk);
 }
 
 export async function answerWithRag(

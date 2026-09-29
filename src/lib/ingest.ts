@@ -111,12 +111,13 @@ export async function ingestRegional5(opts?: { source?: "cron" | "manual"; force
     const errors = pages.filter((p) => p.error).map((p) => `${p.url}: ${p.error}`);
 
     if (okPages.length < MIN_PAGES) {
+      const fichas = await upsertCuratedFichas();
       const result: KnowledgeSyncResult = {
         ranAt,
         source,
-        changed: false,
+        changed: fichas > 0,
         skipped: true,
-        reason: `La web respondió pocas páginas (${okPages.length}). No se tocó la base para no borrar lo que ya anda.`,
+        reason: `La web respondió pocas páginas (${okPages.length}). Se actualizaron ${fichas} fichas institucionales y no se tocó el resto.`,
         stored: await prisma.knowledgeChunk.count(),
         pages: okPages.length,
         errors,
@@ -134,12 +135,13 @@ export async function ingestRegional5(opts?: { source?: "cron" | "manual"; force
     const { added, removed, updated } = diffPages(pages, previous);
 
     if (!opts?.force && fingerprint === previousHash) {
+      await upsertCuratedFichas();
       const result: KnowledgeSyncResult = {
         ranAt,
         source,
-        changed: false,
-        skipped: true,
-        reason: "La web no cambió",
+        changed: true,
+        skipped: false,
+        reason: "Web sin cambios; se actualizaron las fichas institucionales",
         stored: await prisma.knowledgeChunk.count(),
         pages: okPages.length,
         errors,
@@ -152,7 +154,10 @@ export async function ingestRegional5(opts?: { source?: "cron" | "manual"; force
     }
 
     await prisma.knowledgeChunk.deleteMany({
-      where: { pageUrl: { contains: "regional5.com.ar" } },
+      where: {
+        pageUrl: { contains: "regional5.com.ar" },
+        NOT: { title: { startsWith: "[ficha]" } },
+      },
     });
 
     let stored = 0;
@@ -173,20 +178,7 @@ export async function ingestRegional5(opts?: { source?: "cron" | "manual"; force
       }
     }
 
-    const curatedEmbed = await embedTexts(CURATED_KNOWLEDGE.map((c) => c.contentChunk));
-    for (let i = 0; i < CURATED_KNOWLEDGE.length; i++) {
-      const item = CURATED_KNOWLEDGE[i];
-      await prisma.knowledgeChunk.create({
-        data: {
-          pageUrl: item.pageUrl,
-          title: `[ficha] ${item.title}`,
-          contentChunk: item.contentChunk,
-          embedding: curatedEmbed[i] ? JSON.stringify(curatedEmbed[i]) : null,
-          category: item.category,
-        },
-      });
-      stored += 1;
-    }
+    stored += await upsertCuratedFichas();
 
     await setSetting(CONTENT_HASH_KEY, fingerprint);
 
@@ -207,6 +199,33 @@ export async function ingestRegional5(opts?: { source?: "cron" | "manual"; force
   } finally {
     g.__r5IngestLock = false;
   }
+}
+
+export async function upsertCuratedFichas() {
+  await prisma.knowledgeChunk.deleteMany({
+    where: {
+      OR: [
+        { title: { startsWith: "[ficha]" } },
+        { title: { in: CURATED_KNOWLEDGE.map((item) => item.title) } },
+      ],
+    },
+  });
+  const curatedEmbed = await embedTexts(CURATED_KNOWLEDGE.map((c) => c.contentChunk));
+  let stored = 0;
+  for (let i = 0; i < CURATED_KNOWLEDGE.length; i++) {
+    const item = CURATED_KNOWLEDGE[i];
+    await prisma.knowledgeChunk.create({
+      data: {
+        pageUrl: item.pageUrl,
+        title: `[ficha] ${item.title}`,
+        contentChunk: item.contentChunk,
+        embedding: curatedEmbed[i] ? JSON.stringify(curatedEmbed[i]) : null,
+        category: item.category,
+      },
+    });
+    stored += 1;
+  }
+  return stored;
 }
 
 function categoryFromUrl(url: string) {

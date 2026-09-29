@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mesa de atención inteligente · CAPC Regional 5</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #2A1233;
+      --pine: #542460;
+      --moss: #703C78;
+      --clay: #8A3F98;
+      --sand: #F4ECF7;
+      --paper: #FBF8FC;
+      --mist: #E8DCEC;
+      --line: #D7C8DE;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: #111; }
+    body { font-family: Figtree, system-ui, sans-serif; color: var(--ink); }
+    .slide {
+      width: 1920px;
+      height: 1080px;
+      page-break-after: always;
+      break-after: page;
+      position: relative;
+      overflow: hidden;
+      background: var(--paper);
+    }
+    .slide::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 12% -8%, rgba(112, 60, 120, 0.12), transparent 34%),
+        radial-gradient(circle at 92% 0%, rgba(84, 36, 96, 0.12), transparent 30%);
+      pointer-events: none;
+    }
+    .serif { font-family: "Source Serif 4", Georgia, serif; }
+    .kicker {
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--moss);
+    }
+    .footer {
+      position: absolute;
+      left: 72px;
+      right: 72px;
+      bottom: 36px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: rgba(19,32,29,.45);
+      z-index: 2;
+    }
+    .pad { position: relative; z-index: 1; padding: 72px 80px 80px; height: 100%; }
+    h1 { font-size: 64px; line-height: 1.08; font-weight: 600; }
+    h2 { font-size: 48px; line-height: 1.12; font-weight: 600; }
+    p.lead { font-size: 22px; line-height: 1.45; color: rgba(19,32,29,.72); max-width: 820px; }
+    .cover {
+      background: linear-gradient(122deg, #5C2868 0%, #703C78 34%, #542460 62%, #6C307C 82%, #743884 100%);
+      color: var(--sand);
+    }
+    .cover::before {
+      background:
+        linear-gradient(rgba(244,236,247,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(244,236,247,.08) 1px, transparent 1px);
+      background-size: 36px 36px;
+      opacity: 1;
+    }
+    .cover .kicker { color: rgba(244,236,247,.7); }
+    .clay { color: #E0C4E8; }
+    .browser {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 28px 70px -36px rgba(42,18,51,.5);
+    }
+    .browser .bar {
+      height: 36px;
+      background: var(--sand);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 14px;
+    }
+    .browser .bar i {
+      width: 10px; height: 10px; border-radius: 50%; display: block;
+    }
+    .browser img {
+      width: 100%;
+      height: 780px;
+      object-fit: contain;
+      object-position: top center;
+      display: block;
+      background: #f3ede3;
+    }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1.15fr; gap: 48px; height: calc(100% - 8px); align-items: center; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 40px; }
+    .card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 28px;
+      box-shadow: 0 18px 40px -28px rgba(19,32,29,.45);
+    }
+    .card h3 { font-size: 22px; margin-bottom: 10px; }
+    .card p, .card li { font-size: 17px; line-height: 1.45; color: rgba(19,32,29,.72); }
+    .num {
+      width: 42px; height: 42px; border-radius: 12px;
+      background: var(--pine); color: var(--sand);
+      display: grid; place-items: center; font-weight: 700; margin-bottom: 16px;
+    }
+    ul.clean { list-style: none; display: grid; gap: 16px; }
+    ul.clean li {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 12px;
+      font-size: 20px;
+      line-height: 1.4;
+    }
+    ul.clean li::before {
+      content: "";
+      width: 10px; height: 10px; margin-top: 9px;
+      border-radius: 50%; background: var(--clay);
+    }
+    .pill {
+      display: inline-block;
+      background: rgba(196,92,38,.12);
+      color: var(--clay);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .benefits { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 36px; }
+    .benefit { display: flex; gap: 18px; background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 22px 24px; }
+    .benefit b { display: block; font-size: 20px; margin-bottom: 4px; }
+    .benefit span { color: rgba(19,32,29,.68); font-size: 16px; line-height: 1.4; }
+    .icon {
+      flex: none;
+      width: 48px; height: 48px; border-radius: 14px;
+      background: var(--sand); color: var(--pine);
+      display: grid; place-items: center; font-size: 22px;
+    }
+    @media print {
+      body { background: none; }
+      .slide { page-break-after: always; }
+    }
+  </style>
+</head>
+<body>
+
+<section class="slide cover">
+  <div class="pad" style="display:flex;flex-direction:column;justify-content:space-between;">
+    <p class="kicker">Colegio de Arquitectos de Córdoba</p>
+    <div>
+      <p class="clay" style="letter-spacing:.22em;text-transform:uppercase;font-size:16px;font-weight:600;">Regional 5 · Villa María</p>
+      <h1 class="serif" style="max-width:1200px;margin-top:18px;">Mesa de atención inteligente para el Colegio</h1>
+      <p style="margin-top:28px;max-width:780px;font-size:24px;line-height:1.5;color:rgba(243,237,227,.82);">
+        Un chatbot de WhatsApp que responde con la información oficial de Regional 5
+        y deriva a un agente humano solo cuando hay alguien conectado.
+      </p>
+    </div>
+    <p style="color:rgba(243,237,227,.55);font-size:16px;">Presentación de producto · 2026</p>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="pad">
+    <p class="kicker">El contexto</p>
+    <h2 class="serif" style="margin:14px 0 18px;">La mesa recibe siempre las mismas consultas</h2>
+    <p class="lead">Horarios, turnos, firma digital, pagos, trámites. Muchas se pueden resolver al instante. Otras necesitan a una persona. Hoy ese cruce suele ser informal, lento y difícil de medir.</p>
+    <div class="grid-3">
+      <div class="card">
+        <div class="num">01</div>
+        <h3 class="serif">Fuera de horario</h3>
+        <p>La sede atiende lunes a viernes de 8 a 13. El matriculado escribe a cualquier hora y espera hasta el día siguiente.</p>
+      </div>
+      <div class="card">
+        <div class="num">02</div>
+        <h3 class="serif">Consultas repetidas</h3>
+        <p>La web ya tiene la respuesta, pero hay que buscarla, copiarla y reenviar. La mesa se satura con lo mismo.</p>
+      </div>
+      <div class="card">
+        <div class="num">03</div>
+        <h3 class="serif">Sin trazabilidad</h3>
+        <p>No queda claro quién tomó el caso, si se resolvió, cuánto tardó ni cómo evaluó el matriculado la atención.</p>
+      </div>
+    </div>
+    <div class="footer"><span>CAPC Regional 5 · Mesa de atención</span><span>02</span></div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="pad">
+    <p class="kicker">La propuesta</p>
+    <h2 class="serif" style="margin:14px 0 18px;">Bot + personas + conocimiento oficial</h2>
+    <p class="lead">No reemplaza a la mesa: la ordena. El asistente atiende lo rutinario. El equipo humano entra cuando hace falta y está en línea.</p>
+    <div class="grid-3" style="margin-top:48px;">
+      <div class="card">
+        <p class="pill">WhatsApp</p>
+        <h3 class="serif" style="margin-top:16px;">El canal que ya usan</h3>
+        <p>El matriculado escribe por WhatsApp. El mismo hilo puede atenderlo el bot o un agente, sin cambiar de número.</p>
+      </div>
+      <div class="card">
+        <p class="pill">Conocimiento</p>
+        <h3 class="serif" style="margin-top:16px;">Respuestas de la web</h3>
+        <p>Consulta regional5.com.ar y la base institucional. Si no tiene el dato, no inventa: ofrece derivar a un humano.</p>
+      </div>
+      <div class="card">
+        <p class="pill">Mesa</p>
+        <h3 class="serif" style="margin-top:16px;">Inbox en tiempo real</h3>
+        <p>Tesorería, trámites, legales y el resto de áreas ven el chat, toman control, derivan y cierran con registro.</p>
+      </div>
+    </div>
+    <div class="footer"><span>CAPC Regional 5 · Mesa de atención</span><span>03</span></div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="pad">
+    <p class="kicker">Flujo</p>
+    <h2 class="serif" style="margin:14px 0 40px;">Cómo funciona, de punta a punta</h2>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:22px;">
+      <div class="card">
+        <div class="num">1</div>
+        <h3 class="serif">Entra el mensaje</h3>
+        <p>WhatsApp real (Meta Cloud API) o el simulador interno. Queda un único chat por teléfono.</p>
+      </div>
+      <div class="card">
+        <div class="num">2</div>
+        <h3 class="serif">Responde el bot</h3>
+        <p>Busca en la base de Regional 5 y contesta en tono institucional, breve y rioplatense.</p>
+      </div>
+      <div class="card">
+        <div class="num">3</div>
+        <h3 class="serif">Deriva si hay alguien</h3>
+        <p>Si piden un humano y hay un agente conectado, se lo pasa. Si no, sigue el bot y no deja el chat colgado.</p>
+      </div>
+      <div class="card">
+        <div class="num">4</div>
+        <h3 class="serif">Cierra y mide</h3>
+        <p>El agente toma, responde, devuelve o cierra. Se envía encuesta y queda el informe semanal.</p>
+      </div>
+    </div>
+    <p style="margin-top:48px;font-size:20px;color:rgba(19,32,29,.7);max-width:1100px;">
+      El bot solo habla de temas del Colegio. Si la consulta se va de tema, invita a volver a trámites, matrícula o servicios institucionales.
+    </p>
+    <div class="footer"><span>CAPC Regional 5 · Mesa de atención</span><span>04</span></div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="pad">
+    <div class="grid-2">
+      <div>
+        <p class="kicker">Panel</p>
+        <h2 class="serif" style="margin:14px 0 18px;">Acceso interno, con roles</h2>
+        <p class="lead">SuperAdmin y agentes entran al mismo panel. Cada uno ve la mesa, su presencia y las conversaciones.</p>
+        <ul class="clean" style="margin-top:32px;">
+          <li>Credenciales por usuario, sesión segura.</li>
+          <li>El agente marca si está online. Si se desconecta, el bot sigue atendiendo.</li>
+          <li>Áreas: Tesorería, Matriculación, Legales, Tramitación, Consultas y más.</li>
+        </ul>
+      </div>
+      <div class="browser">
+        <div class="bar"><i style="background:#E25B4A"></i><i style="background:#E3B341"></i><i style="background:#62C554"></i></div>
+        <img src="captures/01-login.png" alt="Pantalla de acceso al panel" />
+      </div>
+    </div>
+    <div class="footer"><span>CAPC Regional 5 · Mesa de atención</span><span>05</span></div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="pad">
+    <div class="grid-2">
+      <div>
+        <p class="kicker">Tablero</p>
+        <h2 class="serif" style="margin:14px 0 18px;">La mesa, de un vistazo</h2>
+        <p class="lead">Pendientes, chats con humano, atendidos por el bot y agentes en línea. Sirve para abrir el día y priorizar.</p>
+      </div>
+      <div class="browser">
+        <div class="bar"><i style="background:#E25B4A"></i><i style="background:#E3B341"></i><i style="background:#62C554"></i></div>
+        <img src="captures/02-dashboard.png" alt="Tablero de mesa" />
+      </div>
+    </div>
+    <div class="footer"><span>CAPC Regional 5 · Mesa de atención</span><span>06</span></div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="pad">
+    <div class="grid-2">
+      <div>
+        <p class="kicker">Experiencia</p>
+        <h2 class="serif" style="margin:14px 0 18px;">Así lo ve el matriculado</h2>
+        <p class="lead">El simulador muestra el mismo chat que WhatsApp. Sirve para capacitar al equipo y para mostrar el producto sin conectar Meta.</p>
+        <ul class="clean" style="margin-top:28px;">
+          <li>Pregunta horarios, sede, turnos o trámites y recibe respuesta inmediata.</li>
+          <li>Si pide un asesor y nadie está conectado, el bot se queda y sigue ayudando.</li>
+          <li>El mismo hilo aparece en el Inbox de la mesa.</li>
+        </ul>
+      </div>
+      <div class="browser">
+        <div class="bar"><i style="background:#E25B4A"></i><i style="background:#E3B341"></i><i style="background:#62C554"></i></div>
+        <img src="captures/03-simulador.png" alt="Simulador de WhatsApp" />
+      </div>
+    </div>
+    <div class="footer"><span>CAPC Regional 5 · Mesa de atención</span><span>07</span></div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="pad">
+    <div class="grid-2">
+      <div>
+        <p class="kicker">Operación</p>
+        <h2 class="serif" style="margin:14px 0 18px;">Inbox en tiempo real</h2>
+        <p class="lead">La mesa ve todos los chats, toma el control, escribe como Regional 5, deriva a un colega o cierra el caso.</p>
+        <ul class="clean" style="margin-top:28px;">
+          <li>Estados: bot, pendiente, humano, cerrado.</li>
+          <li>Al cerrar se registra si se resolvió o no, y se envía una encuesta 1 a 5.</li>
+          <li>Alertas cuando llega un mensaje o te derivan un chat.</li>
+        </ul>
+      </div>
+      <div class="browser">
+        <div class="bar"><i style="background:#E25B4A"></i><i style="background:#E3B341"></i><i style="background:#62C554"></i></div>
+        <img src="captures/04-inbox.png" alt="Inbox de WhatsApp" />
+      </div>
+    </div>
+    <div class="footer"><span>CAPC Regional 5 · Mesa de atención</span><span>08</span></div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="pad">
+    <div class="grid-2">
+      <div>
+        <p class="kicker">Equipo</p>
+        <h2 class="serif" style="margin:14px 0 18px;">Agentes por área y presencia</h2>
+        <p class="lead">Cada persona tiene departamento, horarios y temas. El sistema deriva en round-robin entre quienes están conectados.</p>
+        <ul class="clean" style="margin-top:28px;">
+          <li>No se asigna un chat a alguien que no está en línea.</li>
+          <li>Se puede pasar de Tesorería a Tramitación, o devolverlo al bot.</li>
+          <li>El SuperAdmin crea y edita usuarios sin tocar código.</li>
+        </ul>
+      </div>
+      <div class="browser">
+        <div class="bar"><i style="background:#E25B4A"></i><i style="background:#E3B341"></i><i style="background:#62C554"></i></div>
+        <img src="captures/05-agentes.png" alt="Gestión de agentes" />
+      </div>
+    </div>
+    <div class="footer"><span>CAPC Regional 5 · Mesa de atención</span><span>09</span></div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="pad">
+    <div class="grid-2">
+      <div>
+        <p class="kicker">Fuente de verdad</p>
+        <h2 class="serif" style="margin:14px 0 18px;">La web del Colegio, indexada</h2>
+        <p class="lead">El bot no improvisa normativa. Lee fragmentos de regional5.com.ar y se actualiza solo si el sitio cambió.</p>
+        <ul class="clean" style="margin-top:28px;">
+          <li>Sincronización nocturna a las 3:00 (Córdoba).</li>
+          <li>Se puede forzar una revisión desde el panel.</li>
+          <li>Trámites, matrícula, aranceles, subcentros, asesorías y capacitaciones.</li>
+        </ul>
+      </div>
+      <div class="browser">
+        <div class="bar"><i style="background:#E25B4A"></i><i style="background:#E3B341"></i><i style="background:#62C554"></i></div>
+        <img src="captures/06-conocimiento.png" alt="Base de conocimiento" />
+      </div>
+    </div>
+    <div class="footer"><span>CAPC Regional 5 · Mesa de atención</span><span>10</span></div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="pad">
+    <div class="grid-2">
+      <div>
+        <p class="kicker">Gestión</p>
+        <h2 class="serif" style="margin:14px 0 18px;">Informe semanal para la Regional</h2>
+        <p class="lead">Para mostrar resultados: volumen, derivaciones, resueltos, tiempos y satisfacción. Exportable a CSV.</p>
+        <ul class="clean" style="margin-top:28px;">
+          <li>CSAT de la encuesta post-cierre.</li>
+          <li>Quién derivó a quién, por área.</li>
+          <li>Tiempo de primera respuesta del bot y de atención humana.</li>
+        </ul>
+      </div>
+      <div class="browser">
+        <div class="bar"><i style="background:#E25B4A"></i><i style="background:#E3B341"></i><i style="background:#62C554"></i></div>
+        <img src="captures/07-informes.png" alt="Informe semanal" />
+      </div>
+    </div>
+    <div class="footer"><span>CAPC Regional 5 · Mesa de atención</span><span>11</span></div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="pad">
+    <p class="kicker">Valor</p>
+    <h2 class="serif" style="margin:14px 0 8px;">Beneficios para el Colegio</h2>
+    <div class="benefits">
+      <div class="benefit"><div class="icon">1</div><div><b>Menos carga repetitiva</b><span>La mesa deja de copiar horarios, links y requisitos que ya están en la web.</span></div></div>
+      <div class="benefit"><div class="icon">2</div><div><b>Atención continua</b><span>Fuera del 8 a 13 el bot responde. Si no hay agentes conectados, no deja al matriculado esperando en silencio.</span></div></div>
+      <div class="benefit"><div class="icon">3</div><div><b>Respuestas alineadas</b><span>Habla con la información institucional.</span></div></div>
+      <div class="benefit"><div class="icon">4</div><div><b>Personas cuando importan</b><span>Tesorería, legales o trámites entran al hilo exacto, con contexto y sin perder el WhatsApp.</span></div></div>
+      <div class="benefit"><div class="icon">5</div><div><b>Control y evidencia</b><span>Queda registro de derivaciones, cierres y encuesta. Sirve para consejo, auditoría y mejora.</span></div></div>
+      <div class="benefit"><div class="icon">6</div><div><b>Listo para producción</b><span>Simulador para probar hoy. Webhook de WhatsApp Cloud API cuando se habilite el número oficial.</span></div></div>
+    </div>
+    <div class="footer"><span>CAPC Regional 5 · Mesa de atención</span><span>12</span></div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="pad">
+    <p class="kicker">Alcance actual</p>
+    <h2 class="serif" style="margin:14px 0 28px;">Qué incluye la plataforma hoy</h2>
+    <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:28px;">
+      <div class="card">
+        <h3 class="serif">Módulos</h3>
+        <ul class="clean" style="margin-top:18px;font-size:18px;">
+          <li>Chatbot WhatsApp con alcance institucional (no responde fuera de tema).</li>
+          <li>Inbox, toma de control, derivación entre áreas y cierre con encuesta.</li>
+          <li>Base de conocimiento + sync nocturno de regional5.com.ar.</li>
+          <li>Enrutamiento por intención y round-robin.</li>
+          <li>Informes semanales, CSAT y CSV.</li>
+          <li>Simulador para demos y capacitación interna.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 class="serif">Para ponerlo en marcha</h3>
+        <p style="margin-top:16px;">1. Número de WhatsApp Business y Meta Cloud API.</p>
+        <p style="margin-top:10px;">2. Clave de modelo de IA (Gemini / OpenAI) para el diálogo.</p>
+        <p style="margin-top:10px;">3. Usuarios reales de cada mesa, con su área.</p>
+        <p style="margin-top:10px;">4. Hosting (Vercel u otro) y dominio del Colegio.</p>
+        <p style="margin-top:22px;color:rgba(19,32,29,.6);">Hasta entonces, el simulador permite recorrer el producto completo en una reunión.</p>
+      </div>
+    </div>
+    <div class="footer"><span>CAPC Regional 5 · Mesa de atención</span><span>13</span></div>
+  </div>
+</section>
+
+<section class="slide cover">
+  <div class="pad" style="display:flex;flex-direction:column;justify-content:space-between;">
+    <p class="kicker">Próximo paso</p>
+    <div>
+      <h1 class="serif" style="max-width:1300px;">Una demo de 15 minutos alcanza para verlo funcionar</h1>
+      <p style="margin-top:28px;max-width:820px;font-size:24px;line-height:1.5;color:rgba(243,237,227,.82);">
+        Abrimos el simulador, hacemos una consulta real de un matriculado, tomamos el chat en el inbox
+        y mostramos el informe. Sin instalar nada del lado de Meta.
+      </p>
+      <p style="margin-top:40px;font-size:20px;color:#E0C4E8;">Colegio de Arquitectos · Regional 5 · Villa María</p>
+    </div>
+    <p style="color:rgba(243,237,227,.55);">San Juan 1553 · Lun a Vie 8 a 13 hs</p>
+  </div>
+</section>
+
+</body>
+</html>

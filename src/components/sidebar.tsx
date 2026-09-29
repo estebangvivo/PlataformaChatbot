@@ -50,7 +50,7 @@ export function Sidebar({
   }
 
   return (
-    <aside className="flex h-screen w-[268px] flex-col bg-ink text-sand">
+    <aside className="flex h-screen w-[268px] flex-col bg-pine text-sand">
       <div className="border-b border-white/10 px-5 py-6">
         <p className="text-[10px] uppercase tracking-[0.28em] text-sand/50">CAPC</p>
         <p className="font-serif text-2xl leading-none">Regional 5</p>

@@ -24,7 +24,7 @@ Links reales:
 Respondé SOLO JSON válido:
 {"reply":"texto para WhatsApp","handoff":false,"out_of_scope":false,"needs_human":false,"topic":"firma_digital|capacitacion|tramites|pagos|turnos|matriculacion|null"}
 - out_of_scope=true → reply DEBE ser exactamente el MENSAJE DE RECHAZO.
-- Si piden hablar con un asesor/humano: handoff=true.
+- Si piden hablar con un asesor/humano: handoff=true. No prometas que te van a escribir: el sistema avisa si hay alguien conectado.
 - Si el dato no está en el contexto: needs_human=true, no inventes, ofrecé derivar.`;
 
 const ON_TOPIC = [

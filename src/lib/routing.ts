@@ -40,17 +40,22 @@ export async function matchRouting(text: string) {
   return best?.rule ?? null;
 }
 
+const ONLINE_STALE_MS = 3 * 60 * 1000;
+
+export function isDeskUserOnline(user: { isOnline: boolean; lastSeenAt: Date | null }) {
+  if (!user.isOnline) return false;
+  const seen = user.lastSeenAt?.getTime() ?? 0;
+  return Date.now() - seen < ONLINE_STALE_MS;
+}
+
 export async function listDeskAgents() {
   const agents = await prisma.agentProfile.findMany({
     include: { user: true },
     orderBy: { department: "asc" },
   });
-  const staleMs = 3 * 60 * 1000;
   return agents.map((agent) => {
     const hours = parseHours(agent.workHours);
-    const seen = agent.user.lastSeenAt?.getTime() ?? 0;
-    const recentlySeen = Date.now() - seen < staleMs;
-    const online = Boolean(agent.user.isOnline && recentlySeen);
+    const online = isDeskUserOnline(agent.user);
     return {
       profileId: agent.id,
       userId: agent.userId,
@@ -81,24 +86,31 @@ export function matchAgentChoice(text: string, agents: DeskAgent[]) {
   return null;
 }
 
-export function formatHandoffMessage(agents: DeskAgent[], assigned?: DeskAgent | null) {
+export function formatHandoffMessage(
+  agents: DeskAgent[],
+  assigned?: DeskAgent | null,
+  opts?: { unavailable?: DeskAgent | null },
+) {
   const online = agents.filter((a) => a.online);
   const lines = (list: DeskAgent[]) =>
     list.map((a) => `• ${a.fullName} — ${a.department}`).join("\n");
+  const keepTalking =
+    "Seguí hablando conmigo y te ayudo. Te aviso cuando alguien de mesa se conecte.";
 
-  if (assigned) {
+  if (assigned?.online) {
     return `Te dejo con ${assigned.fullName} de ${assigned.department}. En un rato te escriben por acá.`;
   }
 
+  const unavailable = opts?.unavailable ?? (assigned && !assigned.online ? assigned : null);
+  if (unavailable) {
+    return `Ahora ${unavailable.fullName} no está en línea. ${keepTalking}`;
+  }
+
   if (online.length) {
-    return `Ahora hay gente en línea:\n${lines(online)}\n\nSi me decís el área o el nombre, te dejo con esa persona. Si no, alguien de mesa te toma en cuanto pueda.`;
+    return `Ahora hay gente en línea:\n${lines(online)}\n\nSi me decís el área o el nombre, te dejo con esa persona. Si no, seguí hablando conmigo y te ayudo.`;
   }
 
-  if (agents.length) {
-    return `Ahora no hay nadie conectado. Estas son las mesas (lun a vie 8 a 13 hs te responden):\n${lines(agents)}\n\nDecime el área y dejo el aviso para esa persona.`;
-  }
-
-  return "Dale, dejé tu consulta para que te tome alguien de Regional 5. En el horario de mesa (lun a vie 8 a 13 hs) te responden por este mismo chat.";
+  return `Ahora no hay agentes conectados. ${keepTalking}`;
 }
 
 export async function assignToAgent(
@@ -177,15 +189,10 @@ export async function pickAgent(department: string) {
     include: { user: true },
   });
 
-  const available = agents.filter((agent) => {
-    const hours = parseHours(agent.workHours);
-    return agent.user.isOnline && isWithinHours(hours);
-  });
+  const available = agents.filter((agent) => isDeskUserOnline(agent.user));
+  if (available.length === 0) return null;
 
-  const pool = available.length > 0 ? available : agents;
-  if (pool.length === 0) return null;
-
-  const sorted = [...pool].sort((a, b) => {
+  const sorted = [...available].sort((a, b) => {
     const aTime = a.lastAssignedAt?.getTime() ?? 0;
     const bTime = b.lastAssignedAt?.getTime() ?? 0;
     return aTime - bTime;
@@ -215,13 +222,18 @@ export async function requestHandoff(
   if (!conversation) return null;
 
   const agent = opts?.department ? await pickAgent(opts.department) : null;
+  if (!agent) {
+    return { conversation, agent: null };
+  }
+
   const updated = await prisma.conversation.update({
     where: { id: conversationId },
     data: {
-      status: agent ? "HUMAN" : "PENDING",
-      assignedAgentId: agent?.userId ?? conversation.assignedAgentId,
+      status: "HUMAN",
+      assignedAgentId: agent.userId,
       lastIntent: reason,
       botEnabled: false,
+      ...(conversation.assignedAt ? {} : { assignedAt: new Date() }),
     },
   });
 

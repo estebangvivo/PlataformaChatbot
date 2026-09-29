@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { hashPassword, requireApiUser } from "@/lib/auth";
 import { DEFAULT_DEPARTMENT, ROLES } from "@/lib/constants";
+import { notifyWaitingConversations } from "@/lib/waitlist";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireApiUser();
@@ -48,6 +49,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       ...(body.password?.trim() ? { passwordHash: await hashPassword(body.password) } : {}),
     },
   });
+
+  if (!existing.isOnline && updated.isOnline) {
+    await notifyWaitingConversations(updated.id);
+  }
 
   if (nextRole === "AGENT") {
     const department = body.department?.trim() || existing.agentProfile?.department || DEFAULT_DEPARTMENT;
