@@ -202,7 +202,7 @@ export function SimulatorView() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <header className="shrink-0">
-        <h1 className="font-serif text-4xl">Simulador WhatsApp</h1>
+        <h1 className="font-serif text-3xl sm:text-4xl">Simulador WhatsApp</h1>
         <p className="max-w-2xl text-ink/60">
           Hablá acá como si fueras el matriculado. Ves las respuestas del bot y podés seguir el hilo.
           El mismo chat aparece en el Inbox.
@@ -210,8 +210,8 @@ export function SimulatorView() {
       </header>
 
       <div className="grid min-h-0 flex-1 overflow-hidden rounded-3xl border border-line bg-white shadow-sm lg:grid-cols-[280px_1fr]">
-        <aside className="flex shrink-0 flex-col gap-4 border-b border-line p-4 lg:border-b-0 lg:border-r">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">Tu identidad</p>
+        <aside className="grid shrink-0 grid-cols-2 gap-3 border-b border-line p-4 lg:flex lg:flex-col lg:border-b-0 lg:border-r">
+          <p className="col-span-2 text-xs font-semibold uppercase tracking-wide text-ink/50">Tu identidad</p>
           <label className="text-sm">
             <span className="mb-1 block text-ink/60">Teléfono (sin +)</span>
             <Input
@@ -224,7 +224,7 @@ export function SimulatorView() {
             <span className="mb-1 block text-ink/60">Nombre</span>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </label>
-          <Button type="button" variant="outline" onClick={newChat}>
+          <Button type="button" variant="outline" className="col-span-2 lg:col-span-1" onClick={newChat}>
             <RotateCcw size={14} /> Nueva conversación
           </Button>
           {conversation ? (
@@ -238,7 +238,7 @@ export function SimulatorView() {
           </p>
         </aside>
 
-        <section className="flex min-h-0 min-w-0 flex-col">
+        <section className="flex min-h-[28rem] min-w-0 flex-col lg:min-h-0">
           <div className="flex shrink-0 items-center gap-3 border-b border-line bg-pine px-4 py-3 text-sand">
             <div className="grid h-10 w-10 place-items-center rounded-full bg-white/15 text-sm font-semibold">
               {initials(name)}
@@ -407,8 +407,9 @@ export function SimulatorView() {
                 disabled={sending}
                 className="h-11 flex-1 rounded-full border border-line px-4 text-sm outline-none focus:border-moss disabled:opacity-60"
               />
-              <Button type="submit" disabled={sending || !text.trim()}>
-                <Send size={16} /> Enviar
+              <Button type="submit" disabled={sending || !text.trim()} className="shrink-0">
+                <Send size={16} />
+                <span className="hidden sm:inline">Enviar</span>
               </Button>
             </form>
           </footer>

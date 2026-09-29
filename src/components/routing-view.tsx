@@ -75,7 +75,7 @@ export function RoutingView() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="font-serif text-4xl">Enrutamiento</h1>
+        <h1 className="font-serif text-3xl sm:text-4xl">Enrutamiento</h1>
         <p className="max-w-2xl text-ink/60">
           Asociá intenciones y palabras clave con áreas. El bot usa estas reglas y luego asigna por
           disponibilidad u orden de turno (round robin por última asignación).

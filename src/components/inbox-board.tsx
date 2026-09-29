@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Bot, ContactRound, Hand, RotateCcw, Send, X } from "lucide-react";
+import { Bot, ChevronLeft, ContactRound, Hand, RotateCcw, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/badge";
@@ -207,6 +207,11 @@ export function InboxBoard() {
     router.replace(`/inbox?id=${id}`, { scroll: false });
   }
 
+  function clearSelection() {
+    setActiveId(null);
+    router.replace("/inbox", { scroll: false });
+  }
+
   const sortedAgents = useMemo(
     () => [...agents].sort((a, b) => Number(b.isOnline) - Number(a.isOnline) || a.fullName.localeCompare(b.fullName)),
     [agents],
@@ -221,8 +226,13 @@ export function InboxBoard() {
         </div>
         <AgentPresence agents={sortedAgents} />
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-[320px_1fr] overflow-hidden">
-      <aside className="flex min-h-0 flex-col overflow-hidden border-r border-line">
+      <div className="grid min-h-0 flex-1 overflow-hidden md:grid-cols-[minmax(16rem,20rem)_1fr]">
+      <aside
+        className={cn(
+          "flex min-h-0 flex-col overflow-hidden border-r border-line",
+          activeId ? "hidden md:flex" : "flex",
+        )}
+      >
         <div className="border-b border-line p-4">
           <div className="flex flex-wrap gap-1.5">
             {FILTERS.map((item) => (
@@ -267,11 +277,23 @@ export function InboxBoard() {
         </div>
       </aside>
 
-      <section className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-paper">
+      <section
+        className={cn(
+          "flex min-h-0 min-w-0 flex-col overflow-hidden bg-paper",
+          activeId ? "flex" : "hidden md:flex",
+        )}
+      >
         {active ? (
           <>
-            <header className="shrink-0 flex items-center justify-between gap-3 border-b border-line bg-white/90 px-5 py-3">
-              <div>
+            <header className="flex shrink-0 items-start justify-between gap-3 border-b border-line bg-white/90 px-4 py-3 sm:px-5">
+              <div className="min-w-0">
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="mb-1 flex items-center gap-1 text-xs text-moss md:hidden"
+                >
+                  <ChevronLeft size={14} /> Chats
+                </button>
                 <p className="font-medium">{active.userName ?? "WhatsApp"}</p>
                 <p className="text-xs text-ink/50">{formatPhone(active.whatsappPhone)}</p>
                 {active.assignedAgent ? (
@@ -395,8 +417,8 @@ export function InboxBoard() {
             </footer>
           </>
         ) : (
-          <div className="grid h-full place-items-center text-ink/50">
-            No hay conversaciones en este filtro.
+          <div className="grid h-full place-items-center px-6 text-center text-ink/50">
+            Elegí un chat de la lista.
           </div>
         )}
       </section>

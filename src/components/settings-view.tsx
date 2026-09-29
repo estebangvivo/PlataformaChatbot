@@ -96,7 +96,7 @@ export function SettingsView() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="font-serif text-4xl">Configuración</h1>
+        <h1 className="font-serif text-3xl sm:text-4xl">Configuración</h1>
         <p className="text-ink/60">Elegí el modelo de IA del chatbot e integraciones.</p>
       </header>
 

@@ -138,7 +138,7 @@ export function ReportsView() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-serif text-4xl">Informe semanal</h1>
+          <h1 className="font-serif text-3xl sm:text-4xl">Informe semanal</h1>
           <p className="text-ink/60">
             {error
               ? error
@@ -201,7 +201,7 @@ export function ReportsView() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="overflow-hidden">
+        <Card className="overflow-x-auto">
           <div className="border-b border-line px-4 py-3">
             <h2 className="font-serif text-2xl">Por asesor</h2>
           </div>

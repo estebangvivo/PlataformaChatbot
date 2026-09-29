@@ -118,7 +118,7 @@ export function UsersView() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="font-serif text-4xl">Usuarios</h1>
+        <h1 className="font-serif text-3xl sm:text-4xl">Usuarios</h1>
         <p className="text-ink/60">SuperAdmin y operadores del panel.</p>
       </header>
       <Card className="p-5">
@@ -173,7 +173,7 @@ export function UsersView() {
           </div>
         </form>
       </Card>
-      <Card className="overflow-hidden">
+      <Card className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-sand text-left text-xs uppercase tracking-wide text-ink/60">
             <tr>

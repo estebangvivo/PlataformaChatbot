@@ -34,7 +34,7 @@ export function DashboardView() {
     <div className="space-y-8">
       <header>
         <p className="text-xs uppercase tracking-[0.24em] text-moss">Regional 5</p>
-        <h1 className="font-serif text-4xl">Tablero de mesa</h1>
+        <h1 className="font-serif text-3xl sm:text-4xl">Tablero de mesa</h1>
         <p className="mt-2 max-w-2xl text-ink/65">
           Vista operativa del chatbot de WhatsApp, la base de conocimiento de regional5.com.ar y la
           derivación a agentes.

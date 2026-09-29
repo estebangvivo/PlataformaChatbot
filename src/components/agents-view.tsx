@@ -68,7 +68,7 @@ export function AgentsView() {
     <div className="space-y-6">
       <header className="flex items-end justify-between">
         <div>
-          <h1 className="font-serif text-4xl">Agentes</h1>
+          <h1 className="font-serif text-3xl sm:text-4xl">Agentes</h1>
           <p className="text-ink/60">Disponibilidad, áreas y palabras clave.</p>
         </div>
         <label className="flex cursor-pointer items-center gap-2 text-sm text-ink/80">

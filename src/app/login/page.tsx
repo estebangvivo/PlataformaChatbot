@@ -21,8 +21,13 @@ export default function LoginPage() {
           <p className="text-sm text-sand/60">San Juan 1553 · Lun a Vie 8 a 13 hs</p>
         </div>
       </section>
-      <section className="flex items-center justify-center p-6">
-        <div className="w-full max-w-md rounded-3xl border border-line bg-white/80 p-8 shadow-panel">
+      <section className="flex min-h-dvh items-center justify-center p-4 sm:p-6">
+        <div className="w-full max-w-md rounded-3xl border border-line bg-white/80 p-6 shadow-panel sm:p-8">
+          <div className="mb-6 lg:hidden">
+            <p className="text-[10px] uppercase tracking-[0.24em] text-moss">CAPC</p>
+            <p className="font-serif text-2xl leading-none">Regional 5</p>
+            <p className="mt-1 text-sm text-ink/55">Mesa de atención</p>
+          </div>
           <p className="text-xs uppercase tracking-[0.24em] text-moss">Acceso interno</p>
           <h2 className="mt-2 font-serif text-3xl">Iniciar sesión</h2>
           <p className="mt-2 mb-6 text-sm text-ink/60">

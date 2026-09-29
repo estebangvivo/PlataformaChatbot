@@ -92,7 +92,7 @@ export function ContactsView() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-4xl">Personas</h1>
+          <h1 className="font-serif text-3xl sm:text-4xl">Personas</h1>
           <p className="max-w-2xl text-ink/60">
             Datos que el bot va aprendiendo de quienes escriben. Podés completarlos o corregirlos
             a mano; el bot los usa en los próximos mensajes.

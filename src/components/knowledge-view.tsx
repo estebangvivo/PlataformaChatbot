@@ -70,7 +70,7 @@ export function KnowledgeView() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-4xl">Base de conocimiento</h1>
+          <h1 className="font-serif text-3xl sm:text-4xl">Base de conocimiento</h1>
           <p className="max-w-2xl text-ink/60">
             Fragmentos de regional5.com.ar. Las fichas institucionales (horario, turnos, firma
             digital) tienen prioridad sobre el rastreo de la web. Todas las noches, a las 3:00
