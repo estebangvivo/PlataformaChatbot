@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { DEPARTMENTS } from "@/lib/constants";
+import { DEFAULT_DEPARTMENT } from "@/lib/constants";
 
 type Rule = {
   id: string;
@@ -18,17 +18,19 @@ type Rule = {
 
 export function RoutingView() {
   const [rules, setRules] = useState<Rule[]>([]);
+  const [departments, setDepartments] = useState<string[]>([DEFAULT_DEPARTMENT]);
   const [form, setForm] = useState({
     intent: "",
-    department: "Consultas Generales y Ejercicio Profesional",
+    department: DEFAULT_DEPARTMENT,
     keywords: "",
     priority: 10,
   });
 
   async function load() {
     const res = await fetch("/api/routing");
-    const data = await res.json();
+    const data = (await res.json()) as { rules?: Rule[]; departments?: string[] };
     setRules(data.rules ?? []);
+    if (data.departments?.length) setDepartments(data.departments);
   }
 
   useEffect(() => {
@@ -93,8 +95,9 @@ export function RoutingView() {
             className="h-10 rounded-xl border border-line bg-white px-3 text-sm"
             value={form.department}
             onChange={(e) => setForm({ ...form, department: e.target.value })}
+            aria-label="Rol"
           >
-            {DEPARTMENTS.map((d) => (
+            {departments.map((d) => (
               <option key={d}>{d}</option>
             ))}
           </select>

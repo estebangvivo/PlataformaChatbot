@@ -7,23 +7,53 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Role {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String   @default("")
+  isSystem    Boolean  @default(false) @map("is_system")
+  isAdmin     Boolean  @default(false) @map("is_admin")
+  isDeskAgent Boolean  @default(true) @map("is_desk_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  users User[]
+
+  @@map("roles")
+}
+
+model DeskRole {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String   @default("")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("desk_roles")
+}
+
 model User {
   id            String   @id @default(cuid())
   email         String   @unique
   passwordHash  String   @map("password_hash")
   role          String   @default("AGENT")
+  roleId        String?  @map("role_id")
   fullName      String   @map("full_name")
   isOnline      Boolean  @default(false) @map("is_online")
   lastSeenAt    DateTime? @map("last_seen_at")
   createdAt     DateTime @default(now()) @map("created_at")
 
+  accessRole             Role?          @relation(fields: [roleId], references: [id])
   agentProfile           AgentProfile?
   assignedConversations  Conversation[] @relation("AssignedAgent")
   sentMessages           Message[]
   deskEventsAsActor      DeskEvent[]    @relation("DeskEventActor")
   deskEventsFrom         DeskEvent[]    @relation("DeskEventFrom")
   deskEventsTo           DeskEvent[]    @relation("DeskEventTo")
+  teamMemberships        TeamThreadMember[]
+  teamMessages           TeamChatMessage[]
 
+  @@index([roleId])
   @@map("users")
 }
 
@@ -64,7 +94,7 @@ model Conversation {
   reopenCount      Int       @default(0) @map("reopen_count")
   createdAt        DateTime @default(now()) @map("created_at")
 
-  assignedAgent User?      @relation("AssignedAgent", fields: [assignedAgentId], references: [id])
+  assignedAgent User?      @relation("AssignedAgent", fields: [assignedAgentId], references: [id], onDelete: SetNull)
   messages      Message[]
   deskEvents    DeskEvent[]
 
@@ -84,7 +114,7 @@ model Message {
   metadata       String?
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  agent        User?        @relation(fields: [agentId], references: [id])
+  agent        User?        @relation(fields: [agentId], references: [id], onDelete: SetNull)
 
   @@index([conversationId, timestamp])
   @@map("messages")
@@ -147,4 +177,49 @@ model AppSetting {
   value String
 
   @@map("app_settings")
+}
+
+model TeamThread {
+  id            String   @id @default(cuid())
+  key           String   @unique
+  kind          String
+  title         String?
+  lastMessageAt DateTime @default(now()) @map("last_message_at")
+  lastPreview   String   @default("") @map("last_preview")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  members  TeamThreadMember[]
+  messages TeamChatMessage[]
+
+  @@map("team_threads")
+}
+
+model TeamThreadMember {
+  id         String   @id @default(cuid())
+  threadId   String   @map("thread_id")
+  userId     String   @map("user_id")
+  lastReadAt DateTime @default(now()) @map("last_read_at")
+  joinedAt   DateTime @default(now()) @map("joined_at")
+
+  thread TeamThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId])
+  @@index([userId])
+  @@map("team_thread_members")
+}
+
+model TeamChatMessage {
+  id        String   @id @default(cuid())
+  threadId  String   @map("thread_id")
+  senderId  String?  @map("sender_id")
+  content   String
+  metadata  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  thread TeamThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender User?      @relation(fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([threadId, createdAt])
+  @@map("team_chat_messages")
 }

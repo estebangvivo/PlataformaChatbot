@@ -10,7 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/badge";
 import { MENU_OPTIONS } from "@/lib/menu";
+import { MessageMedia } from "@/components/message-media";
 import { cn, formatPhone, initials, parseJson } from "@/lib/utils";
+import { readFileAsMedia } from "@/lib/read-file";
 
 type Message = {
   id: string;
@@ -48,6 +50,7 @@ export function SimulatorView() {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [sending, setSending] = useState(false);
   const [ready, setReady] = useState(false);
+  const [agenda, setAgenda] = useState<Array<{ id: string; whatsappPhone: string; userName: string | null }>>([]);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -75,6 +78,12 @@ export function SimulatorView() {
     setPhone(storedPhone);
     setName(storedName);
     loadChat(storedPhone).finally(() => setReady(true));
+    fetch("/api/contacts")
+      .then((res) => res.json())
+      .then((data: { contacts?: Array<{ id: string; whatsappPhone: string; userName: string | null }> }) => {
+        setAgenda(data.contacts ?? []);
+      })
+      .catch(() => undefined);
   }, [loadChat]);
 
   useEffect(() => {
@@ -212,6 +221,28 @@ export function SimulatorView() {
       <div className="grid min-h-0 flex-1 overflow-hidden rounded-3xl border border-line bg-white shadow-sm lg:grid-cols-[280px_1fr]">
         <aside className="grid shrink-0 grid-cols-2 gap-3 border-b border-line p-4 lg:flex lg:flex-col lg:border-b-0 lg:border-r">
           <p className="col-span-2 text-xs font-semibold uppercase tracking-wide text-ink/50">Tu identidad</p>
+          <label className="col-span-2 text-sm">
+            <span className="mb-1 block text-ink/60">Teléfono agendado</span>
+            <select
+              className="h-10 w-full rounded-xl border border-line bg-white px-3 text-sm outline-none focus:border-moss"
+              value={agenda.some((item) => item.whatsappPhone === phone.replace(/\D/g, "")) ? phone.replace(/\D/g, "") : ""}
+              onChange={(event) => {
+                const next = event.target.value;
+                if (!next) return;
+                const hit = agenda.find((item) => item.whatsappPhone === next);
+                setPhone(next);
+                setName(hit?.userName || "Arq. Prueba");
+                void loadChat(next);
+              }}
+            >
+              <option value="">Elegí una persona agendada…</option>
+              {agenda.map((item) => (
+                <option key={item.id} value={item.whatsappPhone}>
+                  {(item.userName || "Sin nombre") + " · " + formatPhone(item.whatsappPhone)}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="text-sm">
             <span className="mb-1 block text-ink/60">Teléfono (sin +)</span>
             <Input
@@ -291,7 +322,7 @@ export function SimulatorView() {
                       {message.senderType === "BOT" ? <Bot size={10} /> : null}
                       {mine ? "Vos" : message.senderType === "BOT" ? "Bot Regional 5" : "Agente"}
                     </p>
-                    <p className="whitespace-pre-wrap">{message.content}</p>
+                    <MessageMedia content={message.content} metadata={message.metadata} />
                     <p className="mt-1 text-right text-[10px] opacity-50">
                       {format(new Date(message.timestamp), "HH:mm", { locale: es })}
                     </p>
@@ -377,16 +408,11 @@ export function SimulatorView() {
                     toast.error("El archivo supera 6 MB");
                     return;
                   }
-                  const bytes = new Uint8Array(await file.arrayBuffer());
-                  let binary = "";
-                  bytes.forEach((b) => {
-                    binary += String.fromCharCode(b);
-                  });
-                  await send(text, {
-                    mime: file.type || "application/octet-stream",
-                    filename: file.name,
-                    dataBase64: btoa(binary),
-                  });
+                  try {
+                    await send(text, await readFileAsMedia(file));
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "No se pudo leer el archivo");
+                  }
                 }}
               />
               <Button

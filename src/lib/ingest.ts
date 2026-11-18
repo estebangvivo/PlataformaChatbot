@@ -35,7 +35,12 @@ function contentFingerprint(pages: ScrapedPage[]) {
 
 async function existingWebHashes() {
   const chunks = await prisma.knowledgeChunk.findMany({
-    where: { NOT: { title: { startsWith: "[ficha]" } } },
+    where: {
+      pageUrl: { contains: "regional5.com.ar" },
+      NOT: {
+        OR: [{ title: { startsWith: "[ficha]" } }, { title: { startsWith: "[documento]" } }],
+      },
+    },
     select: { pageUrl: true, contentChunk: true },
   });
   const grouped = new Map<string, string[]>();
@@ -156,7 +161,9 @@ export async function ingestRegional5(opts?: { source?: "cron" | "manual"; force
     await prisma.knowledgeChunk.deleteMany({
       where: {
         pageUrl: { contains: "regional5.com.ar" },
-        NOT: { title: { startsWith: "[ficha]" } },
+        NOT: {
+          OR: [{ title: { startsWith: "[ficha]" } }, { title: { startsWith: "[documento]" } }],
+        },
       },
     });
 

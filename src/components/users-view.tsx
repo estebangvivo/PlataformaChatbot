@@ -5,15 +5,23 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { DEFAULT_DEPARTMENT, departmentSelectOptions } from "@/lib/constants";
+import { DEFAULT_DEPARTMENT } from "@/lib/constants";
 
 type UserRow = {
   id: string;
   email: string;
   role: string;
+  roleName?: string;
   fullName: string;
   isOnline: boolean;
   department: string | null;
+};
+
+type AccessRole = {
+  id: string;
+  slug: string;
+  name: string;
+  isDeskAgent: boolean;
 };
 
 const emptyForm = {
@@ -26,18 +34,26 @@ const emptyForm = {
 
 export function UsersView() {
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [roles, setRoles] = useState<AccessRole[]>([]);
+  const [departments, setDepartments] = useState<string[]>([DEFAULT_DEPARTMENT]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const selectedRole = roles.find((role) => role.slug === form.role);
+  const showDepartment = selectedRole ? selectedRole.isDeskAgent : form.role !== "SUPERADMIN";
+
   async function load() {
-    const res = await fetch("/api/users");
-    if (res.status === 403) {
-      toast.error("Solo SuperAdmin puede gestionar usuarios");
+    const [usersRes, rolesRes] = await Promise.all([fetch("/api/users"), fetch("/api/roles")]);
+    if (usersRes.status === 403) {
+      toast.error("Solo un administrador puede gestionar usuarios");
       return;
     }
-    const data = await res.json();
+    const data = await usersRes.json();
+    const rolesData = (await rolesRes.json()) as { roles?: AccessRole[]; departments?: string[] };
     setUsers(data.users ?? []);
+    setRoles(rolesData.roles ?? []);
+    if (rolesData.departments?.length) setDepartments(rolesData.departments);
   }
 
   useEffect(() => {
@@ -72,7 +88,7 @@ export function UsersView() {
           fullName: form.fullName,
           email: form.email,
           role: form.role,
-          department: form.role === "AGENT" ? form.department : undefined,
+          department: showDepartment ? form.department : undefined,
           ...(form.password.trim() ? { password: form.password } : {}),
         }),
       });
@@ -95,7 +111,8 @@ export function UsersView() {
     });
     setSaving(false);
     if (!res.ok) {
-      toast.error("No se pudo crear");
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error ?? "No se pudo crear");
       return;
     }
     toast.success("Usuario creado");
@@ -119,7 +136,9 @@ export function UsersView() {
     <div className="space-y-6">
       <header>
         <h1 className="font-serif text-3xl sm:text-4xl">Usuarios</h1>
-        <p className="text-ink/60">SuperAdmin y operadores del panel.</p>
+        <p className="text-ink/60">
+          Cuentas del panel. El rol de mesa (Tesorería, Visador…) se administra en Agentes.
+        </p>
       </header>
       <Card className="p-5">
         <h2 className="mb-4 font-serif text-2xl">{editingId ? "Editar usuario" : "Nuevo usuario"}</h2>
@@ -144,24 +163,33 @@ export function UsersView() {
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required={!editingId}
           />
-          <select
-            className="h-10 rounded-xl border border-line bg-white px-3 text-sm"
-            value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
-          >
-            <option value="AGENT">Agente</option>
-            <option value="SUPERADMIN">SuperAdmin</option>
-          </select>
-          {form.role === "AGENT" ? (
+          <label className="block text-sm">
+            <span className="mb-1.5 block text-ink/70">Tipo de cuenta</span>
             <select
-              className="h-10 rounded-xl border border-line bg-white px-3 text-sm"
-              value={form.department}
-              onChange={(e) => setForm({ ...form, department: e.target.value })}
+              className="h-10 w-full rounded-xl border border-line bg-white px-3 text-sm"
+              value={form.role}
+              onChange={(e) => setForm({ ...form, role: e.target.value })}
             >
-              {departmentSelectOptions(form.department).map((d) => (
-                <option key={d}>{d}</option>
+              {roles.map((role) => (
+                <option key={role.id} value={role.slug}>
+                  {role.name}
+                </option>
               ))}
             </select>
+          </label>
+          {showDepartment ? (
+            <label className="block text-sm">
+              <span className="mb-1.5 block text-ink/70">Rol de mesa</span>
+              <select
+                className="h-10 w-full rounded-xl border border-line bg-white px-3 text-sm"
+                value={form.department}
+                onChange={(e) => setForm({ ...form, department: e.target.value })}
+              >
+                {departments.map((d) => (
+                  <option key={d}>{d}</option>
+                ))}
+              </select>
+            </label>
           ) : null}
           <div className="flex flex-wrap gap-2 md:col-span-2">
             <Button disabled={saving}>{editingId ? "Guardar cambios" : "Crear"}</Button>
@@ -179,8 +207,8 @@ export function UsersView() {
             <tr>
               <th className="px-4 py-3">Nombre</th>
               <th>Email</th>
+              <th>Cuenta</th>
               <th>Rol</th>
-              <th>Área</th>
               <th>Estado</th>
               <th />
             </tr>
@@ -190,7 +218,7 @@ export function UsersView() {
               <tr key={user.id} className={`border-t border-line ${editingId === user.id ? "bg-sand/70" : ""}`}>
                 <td className="px-4 py-3 font-medium">{user.fullName}</td>
                 <td>{user.email}</td>
-                <td>{user.role}</td>
+                <td>{user.roleName ?? user.role}</td>
                 <td>{user.department ?? "—"}</td>
                 <td>{user.isOnline ? "Online" : "Offline"}</td>
                 <td className="pr-4 text-right">

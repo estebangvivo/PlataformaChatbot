@@ -4,13 +4,14 @@ import { answerWithRag } from "./rag";
 import { hasAi } from "./ai-providers";
 import { matchRouting, requestHandoff, wantsHuman, listDeskAgents, matchAgentChoice, formatHandoffMessage } from "./routing";
 import { converseWithAi } from "./dialogue";
-import { sendWhatsAppText, sendWhatsAppMenu } from "./whatsapp";
+import { sendWhatsAppText, sendWhatsAppMenu, sendWhatsAppMedia } from "./whatsapp";
 import { isQueryRelevant, SCOPE_REJECTION } from "./scope";
 import { DESK_EVENT, logDeskEvent } from "./desk-log";
 import { applySurveyReply } from "./survey";
 import { MENU_INTRO, MENU_OPTIONS, resolveMenuChoice } from "./menu";
 import { subscribeAgentWait } from "./waitlist";
-import { interpretUserMedia, mediaLabel, type InboundMedia } from "./media";
+import { interpretUserMedia, mediaKind, mediaLabel, type InboundMedia } from "./media";
+import { savePublicUpload } from "./uploads";
 import {
   composeHumanReply,
   extractFacts,
@@ -149,11 +150,19 @@ export async function handleInboundWhatsApp(params: {
 
   let userText = params.text.trim();
   let userDisplay = params.text.trim();
+  let userMediaMeta: { kind: string; mime: string; filename?: string; url?: string } | undefined;
   if (params.media) {
     const interpreted = await interpretUserMedia(params.media);
+    const stored = await savePublicUpload(params.media);
     const icon = interpreted.kind === "audio" ? "🎙️" : interpreted.kind === "image" ? "📷" : "📄";
     userDisplay = `${icon} ${mediaLabel(interpreted.kind)}\n${interpreted.text}`;
     userText = [params.text.trim(), interpreted.text].filter(Boolean).join("\n");
+    userMediaMeta = {
+      kind: "media",
+      mime: params.media.mime,
+      filename: params.media.filename || stored.filename,
+      url: stored.url,
+    };
   }
 
   await saveMessage({
@@ -161,7 +170,7 @@ export async function handleInboundWhatsApp(params: {
     senderType: "USER",
     content: userDisplay || userText || "(archivo)",
     whatsappId: params.whatsappId,
-    metadata: params.media ? { kind: "media", mime: params.media.mime } : undefined,
+    metadata: userMediaMeta,
   });
 
   if (conversation.status === "CLOSED" && conversation.surveyStatus === "pending") {
@@ -463,18 +472,99 @@ export async function sendAgentReply(params: {
   conversationId: string;
   agentId: string;
   text: string;
+  media?: InboundMedia;
 }) {
   const conversation = await prisma.conversation.findUnique({
     where: { id: params.conversationId },
   });
   if (!conversation) throw new Error("Conversación no encontrada");
 
-  const message = await saveMessage({
+  const caption = params.text.trim();
+  let content = caption;
+  let metadata: unknown;
+  if (params.media) {
+    const stored = await savePublicUpload(params.media);
+    const kind = mediaKind(params.media.mime);
+    content = caption || `📎 ${mediaLabel(kind)}${params.media.filename ? ` · ${params.media.filename}` : ""}`;
+    metadata = {
+      kind: "media",
+      mime: params.media.mime,
+      filename: params.media.filename || stored.filename,
+      url: stored.url,
+    };
+    await sendWhatsAppMedia(conversation.whatsappPhone, params.media, caption || undefined);
+  } else {
+    await sendWhatsAppText(conversation.whatsappPhone, caption);
+  }
+
+  return saveMessage({
     conversationId: conversation.id,
     senderType: "AGENT",
-    content: params.text,
+    content,
     agentId: params.agentId,
+    metadata,
   });
-  await sendWhatsAppText(conversation.whatsappPhone, params.text);
-  return message;
+}
+
+export async function startDeskConversation(params: {
+  phone: string;
+  name?: string;
+  agentId: string;
+}) {
+  const phone = params.phone.replace(/\D/g, "");
+  if (phone.length < 8) throw new Error("El teléfono no es válido");
+
+  const existing = await prisma.conversation.findUnique({ where: { whatsappPhone: phone } });
+  const wasClosed = existing?.status === "CLOSED";
+  const conversation = existing
+    ? await prisma.conversation.update({
+        where: { id: existing.id },
+        data: {
+          status: "HUMAN",
+          botEnabled: false,
+          assignedAgentId: params.agentId,
+          lastMessageAt: new Date(),
+          ...(params.name?.trim() && !existing.userName ? { userName: params.name.trim() } : {}),
+          ...(wasClosed
+            ? {
+                closeOutcome: null,
+                closedAt: null,
+                reopenCount: { increment: 1 },
+                surveyStatus: existing.surveyStatus === "pending" ? "skipped" : existing.surveyStatus,
+              }
+            : {}),
+          ...(!existing.assignedAt ? { assignedAt: new Date() } : {}),
+        },
+        include: {
+          assignedAgent: { select: { id: true, fullName: true } },
+          messages: { orderBy: { timestamp: "asc" } },
+        },
+      })
+    : await prisma.conversation.create({
+        data: {
+          whatsappPhone: phone,
+          userName: params.name?.trim() || null,
+          status: "HUMAN",
+          botEnabled: false,
+          assignedAgentId: params.agentId,
+          assignedAt: new Date(),
+          lastMessageAt: new Date(),
+        },
+        include: {
+          assignedAgent: { select: { id: true, fullName: true } },
+          messages: { orderBy: { timestamp: "asc" } },
+        },
+      });
+
+  await logDeskEvent({
+    type: existing ? (wasClosed ? DESK_EVENT.reopened : DESK_EVENT.takeover) : DESK_EVENT.takeover,
+    conversationId: conversation.id,
+    actorUserId: params.agentId,
+    toAgentId: params.agentId,
+    source: "agent",
+    note: "inicio_mesa",
+  });
+  hub.emitEvent({ type: "conversation.assigned", payload: conversation });
+  hub.emitEvent({ type: "conversation.updated", payload: { conversationId: conversation.id } });
+  return conversation;
 }

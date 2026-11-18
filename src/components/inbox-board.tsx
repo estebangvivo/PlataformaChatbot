@@ -5,17 +5,26 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Bot, ChevronLeft, ContactRound, Hand, RotateCcw, Send, X } from "lucide-react";
+import { Bot, ChevronLeft, ContactRound, Hand, Paperclip, Plus, RotateCcw, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/badge";
+import { MessageMedia } from "@/components/message-media";
 import { cn, formatPhone, initials, parseJson } from "@/lib/utils";
+import { readFileAsMedia } from "@/lib/read-file";
 
 type Message = {
   id: string;
   senderType: string;
   content: string;
   timestamp: string;
+  metadata?: string | null;
+};
+
+type AgendaContact = {
+  id: string;
+  whatsappPhone: string;
+  userName: string | null;
 };
 
 type Conversation = {
@@ -62,7 +71,16 @@ export function InboxBoard() {
   const [closing, setClosing] = useState(false);
   const [closeNote, setCloseNote] = useState("");
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const pendingMedia = useRef<{ mime: string; filename: string; dataBase64: string } | null>(null);
   const stickToBottom = useRef(true);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [agenda, setAgenda] = useState<AgendaContact[]>([]);
+  const [agendaQ, setAgendaQ] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newName, setNewName] = useState("");
+  const [starting, setStarting] = useState(false);
+  const [attachName, setAttachName] = useState<string | null>(null);
 
   async function loadList() {
     const res = await fetch("/api/conversations");
@@ -186,20 +204,76 @@ export function InboxBoard() {
   }
 
   async function send() {
-    if (!active || !draft.trim()) return;
+    const media = pendingMedia.current;
+    if (!active || (!draft.trim() && !media)) return;
     const content = draft.trim();
     setDraft("");
+    pendingMedia.current = null;
+    setAttachName(null);
     const res = await fetch(`/api/conversations/${active.id}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, media }),
     });
     if (!res.ok) {
       toast.error("No se pudo enviar");
       setDraft(content);
+      pendingMedia.current = media;
+      setAttachName(media?.filename ?? null);
       return;
     }
     await loadOne(active.id);
+  }
+
+  function agendaFromRows(rows: Array<{ id: string; whatsappPhone: string; userName: string | null }>) {
+    const seen = new Set<string>();
+    const next: AgendaContact[] = [];
+    for (const row of rows) {
+      const phone = row.whatsappPhone.replace(/\D/g, "");
+      if (phone.length < 8 || seen.has(phone)) continue;
+      seen.add(phone);
+      next.push({ id: row.id, whatsappPhone: phone, userName: row.userName });
+    }
+    return next;
+  }
+
+  async function openComposer() {
+    setComposerOpen(true);
+    setAgenda(agendaFromRows(conversations));
+    try {
+      const res = await fetch("/api/contacts");
+      const data = (await res.json()) as { contacts?: AgendaContact[] };
+      if (data.contacts?.length) setAgenda(agendaFromRows(data.contacts));
+    } catch {
+      /* se queda la lista del inbox */
+    }
+  }
+
+  async function startWith(phone: string, name?: string) {
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 8) {
+      toast.error("Poné un teléfono válido");
+      return;
+    }
+    setStarting(true);
+    const res = await fetch("/api/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: digits, name }),
+    });
+    const data = (await res.json()) as { error?: string; conversation?: Conversation };
+    setStarting(false);
+    if (!res.ok || !data.conversation) {
+      toast.error(data.error ?? "No se pudo iniciar el chat");
+      return;
+    }
+    setComposerOpen(false);
+    setAgendaQ("");
+    setNewPhone("");
+    setNewName("");
+    await loadList();
+    selectConversation(data.conversation.id);
+    toast.success("Chat abierto. Ya podés escribir o adjuntar un archivo.");
   }
 
   function selectConversation(id: string) {
@@ -224,7 +298,12 @@ export function InboxBoard() {
           <h1 className="font-serif text-2xl">Inbox</h1>
           <p className="text-xs text-ink/50">WhatsApp en tiempo real</p>
         </div>
-        <AgentPresence agents={sortedAgents} />
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" size="sm" variant="outline" onClick={openComposer}>
+            <Plus size={14} /> Nuevo chat
+          </Button>
+          <AgentPresence agents={sortedAgents} />
+        </div>
       </div>
       <div className="grid min-h-0 flex-1 overflow-hidden md:grid-cols-[minmax(16rem,20rem)_1fr]">
       <aside
@@ -234,6 +313,67 @@ export function InboxBoard() {
         )}
       >
         <div className="border-b border-line p-4">
+          {composerOpen ? (
+            <div className="mb-3 space-y-2 rounded-2xl border border-line bg-sand/60 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">Teléfono agendado</p>
+                <button type="button" className="text-xs text-ink/50" onClick={() => setComposerOpen(false)}>
+                  Cerrar
+                </button>
+              </div>
+              <input
+                value={agendaQ}
+                onChange={(e) => setAgendaQ(e.target.value)}
+                placeholder="Buscar nombre o número…"
+                className="h-9 w-full rounded-full border border-line bg-white px-3 text-xs outline-none focus:border-moss"
+              />
+              <div className="max-h-40 overflow-y-auto">
+                {agenda
+                  .filter((contact) => {
+                    const hay = `${contact.userName ?? ""} ${contact.whatsappPhone}`.toLowerCase();
+                    return hay.includes(agendaQ.trim().toLowerCase());
+                  })
+                  .slice(0, 12)
+                  .map((contact) => (
+                    <button
+                      key={contact.id}
+                      type="button"
+                      disabled={starting}
+                      onClick={() => startWith(contact.whatsappPhone, contact.userName ?? undefined)}
+                      className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-xs hover:bg-white"
+                    >
+                      <span className="truncate font-medium">{contact.userName || "Sin nombre"}</span>
+                      <span className="shrink-0 text-ink/45">{formatPhone(contact.whatsappPhone)}</span>
+                    </button>
+                  ))}
+                {agenda.length === 0 ? (
+                  <p className="px-2 py-1 text-xs text-ink/45">Todavía no hay personas agendadas.</p>
+                ) : null}
+              </div>
+              <p className="text-[11px] text-ink/45">O escribí un número nuevo</p>
+              <input
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value)}
+                placeholder="5493534…"
+                className="h-9 w-full rounded-full border border-line bg-white px-3 text-xs outline-none focus:border-moss"
+              />
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Nombre (opcional)"
+                className="h-9 w-full rounded-full border border-line bg-white px-3 text-xs outline-none focus:border-moss"
+              />
+              <Button
+                type="button"
+                size="sm"
+                className="w-full"
+                disabled={starting}
+                onClick={() => startWith(newPhone, newName)}
+              >
+                Abrir chat
+              </Button>
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-1.5">
             {FILTERS.map((item) => (
               <button
@@ -387,7 +527,7 @@ export function InboxBoard() {
                         {message.senderType === "BOT" ? <Bot size={10} /> : null}
                         {message.senderType === "USER" ? "WhatsApp" : message.senderType === "BOT" ? "Bot" : "Agente"}
                       </p>
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <MessageMedia content={message.content} metadata={message.metadata} />
                       <p className="mt-1 text-[10px] opacity-60">
                         {format(new Date(message.timestamp), "HH:mm", { locale: es })}
                       </p>
@@ -402,7 +542,36 @@ export function InboxBoard() {
                   El bot puede responder solo. Tomá el control para escribir como agente.
                 </p>
               ) : null}
+              {attachName ? (
+                <p className="mb-2 truncate text-xs text-moss">Adjunto: {attachName}</p>
+              ) : null}
               <div className="flex gap-2">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                  className="hidden"
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (!file) return;
+                    try {
+                      pendingMedia.current = await readFileAsMedia(file);
+                      setAttachName(file.name);
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : "No se pudo leer el archivo");
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  title="Adjuntar archivo"
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <Paperclip size={16} />
+                </Button>
                 <input
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
@@ -410,7 +579,7 @@ export function InboxBoard() {
                   placeholder="Escribir al matriculado…"
                   className="h-11 flex-1 rounded-full border border-line px-4 text-sm outline-none focus:border-moss"
                 />
-                <Button onClick={send}>
+                <Button onClick={send} disabled={!draft.trim() && !attachName}>
                   <Send size={16} /> Enviar
                 </Button>
               </div>
@@ -418,7 +587,12 @@ export function InboxBoard() {
           </>
         ) : (
           <div className="grid h-full place-items-center px-6 text-center text-ink/50">
-            Elegí un chat de la lista.
+            <div>
+              <p>Elegí un chat de la lista o iniciá uno con un teléfono agendado.</p>
+              <Button type="button" className="mt-3" size="sm" onClick={openComposer}>
+                <Plus size={14} /> Nuevo chat
+              </Button>
+            </div>
           </div>
         )}
       </section>

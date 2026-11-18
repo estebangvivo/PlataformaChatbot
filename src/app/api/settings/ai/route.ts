@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiUser } from "@/lib/auth";
-import { ROLES } from "@/lib/constants";
+import { isAdminUser, requireApiAdmin, requireApiUser } from "@/lib/auth";
 import {
   AI_PROVIDERS,
   getAiConfig,
@@ -16,16 +15,13 @@ export async function GET() {
   const cfg = await getAiConfig();
   return NextResponse.json({
     ...publicAiStatus(cfg),
-    canEdit: user.role === ROLES.SUPERADMIN,
+    canEdit: isAdminUser(user),
   });
 }
 
 export async function POST(request: Request) {
-  const { user, error } = await requireApiUser();
+  const { error } = await requireApiAdmin();
   if (error) return error;
-  if (user.role !== ROLES.SUPERADMIN) {
-    return NextResponse.json({ error: "Solo SuperAdmin" }, { status: 403 });
-  }
 
   const body = (await request.json()) as {
     provider?: string;

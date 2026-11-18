@@ -19,9 +19,12 @@ export async function GET() {
     },
   });
   chunks.sort((a, b) => {
-    const aFicha = a.title?.startsWith("[ficha]") ? 0 : 1;
-    const bFicha = b.title?.startsWith("[ficha]") ? 0 : 1;
-    return aFicha - bFicha;
+    const rank = (title: string | null, url: string) => {
+      if (title?.startsWith("[ficha]")) return 0;
+      if (title?.startsWith("[documento]") || url.startsWith("/uploads/")) return 1;
+      return 2;
+    };
+    return rank(a.title, a.pageUrl) - rank(b.title, b.pageUrl);
   });
   const lastSync = await readLastSync();
   return NextResponse.json({

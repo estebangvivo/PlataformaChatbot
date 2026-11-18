@@ -1,24 +1,25 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { hashPassword, requireApiUser } from "@/lib/auth";
-import { DEFAULT_DEPARTMENT, ROLES } from "@/lib/constants";
+import { hashPassword, requireApiAdmin } from "@/lib/auth";
+import { DEFAULT_DEPARTMENT } from "@/lib/constants";
+import { defaultWorkHours, ensureSystemRoles, findRoleBySlugOrId } from "@/lib/roles";
 
 export async function GET() {
-  const { user, error } = await requireApiUser();
+  const { error } = await requireApiAdmin();
   if (error) return error;
-  if (user.role !== ROLES.SUPERADMIN) {
-    return NextResponse.json({ error: "Solo SuperAdmin" }, { status: 403 });
-  }
+  await ensureSystemRoles();
 
   const users = await prisma.user.findMany({
-    include: { agentProfile: true },
+    include: { agentProfile: true, accessRole: true },
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json({
     users: users.map((u) => ({
       id: u.id,
       email: u.email,
-      role: u.role,
+      role: u.accessRole?.slug ?? u.role,
+      roleName: u.accessRole?.name ?? u.role,
+      roleId: u.roleId,
       fullName: u.fullName,
       isOnline: u.isOnline,
       createdAt: u.createdAt,
@@ -28,11 +29,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { user, error } = await requireApiUser();
+  const { error } = await requireApiAdmin();
   if (error) return error;
-  if (user.role !== ROLES.SUPERADMIN) {
-    return NextResponse.json({ error: "Solo SuperAdmin" }, { status: 403 });
-  }
+  await ensureSystemRoles();
 
   const body = (await request.json()) as {
     email?: string;
@@ -41,31 +40,49 @@ export async function POST(request: Request) {
     role?: string;
     department?: string;
     keywords?: string[];
+    workHours?: { days: number[]; start: string; end: string };
   };
 
   if (!body.email || !body.password || !body.fullName) {
     return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
   }
 
+  const email = body.email.toLowerCase().trim();
+  const clash = await prisma.user.findUnique({ where: { email } });
+  if (clash) return NextResponse.json({ error: "Ese email ya está en uso" }, { status: 409 });
+
+  const accessRole = (await findRoleBySlugOrId(body.role)) ?? (await findRoleBySlugOrId("AGENT"));
+  if (!accessRole) return NextResponse.json({ error: "Rol inválido" }, { status: 400 });
+
+  const hours = body.workHours ?? defaultWorkHours();
   const created = await prisma.user.create({
     data: {
-      email: body.email.toLowerCase(),
+      email,
       passwordHash: await hashPassword(body.password),
-      fullName: body.fullName,
-      role: body.role === "SUPERADMIN" ? "SUPERADMIN" : "AGENT",
-      ...(body.role !== "SUPERADMIN"
+      fullName: body.fullName.trim(),
+      role: accessRole.slug,
+      roleId: accessRole.id,
+      ...(accessRole.isDeskAgent
         ? {
             agentProfile: {
               create: {
-                department: body.department || DEFAULT_DEPARTMENT,
-                workHours: JSON.stringify({ days: [1, 2, 3, 4, 5], start: "08:00", end: "14:00" }),
+                department: body.department?.trim() || DEFAULT_DEPARTMENT,
+                workHours: JSON.stringify(hours),
                 assignedKeywords: JSON.stringify(body.keywords ?? []),
               },
             },
           }
         : {}),
     },
+    include: { agentProfile: true, accessRole: true },
   });
 
-  return NextResponse.json({ user: { id: created.id, email: created.email } });
+  return NextResponse.json({
+    user: {
+      id: created.id,
+      email: created.email,
+      role: accessRole.slug,
+      fullName: created.fullName,
+    },
+  });
 }

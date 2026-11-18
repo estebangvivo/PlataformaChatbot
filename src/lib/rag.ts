@@ -98,13 +98,14 @@ function lexicalScore(query: string, chunk: string) {
     (/tramite|expediente/.test(q) && /tramit|expediente/.test(c) ? 0.22 : 0) +
     (/firma digital|cidi/.test(q) && /firma digital|cidi/.test(c) ? 0.45 : 0);
   const fichaBoost = /\[ficha\]/.test(chunk) ? 0.38 : 0;
+  const docBoost = /\[documento\]/.test(chunk) ? 0.22 : 0;
   const junkPenalty =
     /todos los derechos reservados|iniciar sesion|dejar un comentario/.test(c) || /^[a-z]/.test(chunk.trim())
       ? 0.45
       : 0;
   return Math.min(
     1,
-    Math.max(0, hits / Math.max(terms.length, 1) + phraseBoost + synonymBoost + fichaBoost - junkPenalty),
+    Math.max(0, hits / Math.max(terms.length, 1) + phraseBoost + synonymBoost + fichaBoost + docBoost - junkPenalty),
   );
 }
 
@@ -130,7 +131,11 @@ export async function retrieveChunks(query: string, k = 5): Promise<RetrievedChu
         ? cosine(queryEmbedding, stored)
         : 0;
     const curated = Boolean(row.title?.startsWith("[ficha]"));
-    const score = (queryEmbedding ? semantic * 0.62 + lexical * 0.38 : lexical) + (curated ? 0.12 : 0);
+    const uploaded = Boolean(row.title?.startsWith("[documento]"));
+    const score =
+      (queryEmbedding ? semantic * 0.62 + lexical * 0.38 : lexical) +
+      (curated ? 0.12 : 0) +
+      (uploaded ? 0.08 : 0);
     return {
       id: row.id,
       pageUrl: row.pageUrl,

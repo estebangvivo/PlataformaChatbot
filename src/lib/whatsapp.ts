@@ -1,7 +1,7 @@
 const GRAPH = "https://graph.facebook.com/v21.0";
 
 import { MENU_INTRO, MENU_OPTIONS } from "./menu";
-import type { InboundMedia } from "./media";
+import { mediaKind, type InboundMedia } from "./media";
 
 export type InboundMessage = {
   from: string;
@@ -41,6 +41,56 @@ export async function sendWhatsAppText(to: string, body: string) {
   }
 
   return { ok: true, simulated: false as const, data: await res.json() };
+}
+
+export async function sendWhatsAppMedia(to: string, media: InboundMedia, caption?: string) {
+  if (!isWhatsAppConfigured()) {
+    return { ok: true, simulated: true as const };
+  }
+
+  const token = process.env.WHATSAPP_ACCESS_TOKEN!;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID!;
+  const bytes = new Uint8Array(Buffer.from(media.dataBase64, "base64"));
+  const form = new FormData();
+  form.append("messaging_product", "whatsapp");
+  form.append("type", media.mime);
+  form.append("file", new Blob([bytes], { type: media.mime }), media.filename || "archivo");
+
+  const upload = await fetch(`${GRAPH}/${phoneId}/media`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  const uploaded = (await upload.json()) as { id?: string; error?: { message?: string } };
+  if (!upload.ok || !uploaded.id) {
+    throw new Error(`WhatsApp media: ${uploaded.error?.message ?? upload.status}`);
+  }
+
+  const kind = mediaKind(media.mime);
+  const type = kind === "image" ? "image" : kind === "audio" ? "audio" : "document";
+  const payload: Record<string, unknown> = {
+    id: uploaded.id,
+  };
+  if (caption && type !== "audio") payload.caption = caption;
+  if (type === "document" && media.filename) payload.filename = media.filename;
+
+  const res = await fetch(`${GRAPH}/${phoneId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to: to.replace(/\D/g, ""),
+      type,
+      [type]: payload,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`WhatsApp API: ${await res.text()}`);
+  }
+  return { ok: true, simulated: false as const };
 }
 
 export async function sendWhatsAppMenu(to: string) {

@@ -11,3 +11,5 @@ dist
 prisma/dev.db
 prisma/dev.db-journal
 *.tsbuildinfo
+public/uploads/*
+!public/uploads/.gitkeep

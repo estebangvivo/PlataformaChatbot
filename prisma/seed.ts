@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { DEPARTMENTS } from "../src/lib/constants";
 
 const prisma = new PrismaClient();
 
@@ -180,13 +181,41 @@ async function main() {
   await prisma.routingRule.deleteMany();
   await prisma.agentProfile.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.role.deleteMany();
+  await prisma.deskRole.deleteMany();
   await prisma.appSetting.deleteMany();
+
+  await prisma.deskRole.createMany({
+    data: DEPARTMENTS.map((name, i) => ({ name, sortOrder: i, description: "" })),
+  });
+
+  const superadminRole = await prisma.role.create({
+    data: {
+      slug: "SUPERADMIN",
+      name: "SuperAdmin",
+      description: "Administración total del panel, usuarios y configuración.",
+      isSystem: true,
+      isAdmin: true,
+      isDeskAgent: false,
+    },
+  });
+  const agentRole = await prisma.role.create({
+    data: {
+      slug: "AGENT",
+      name: "Agente",
+      description: "Atiende la mesa de WhatsApp y deriva consultas.",
+      isSystem: true,
+      isAdmin: false,
+      isDeskAgent: true,
+    },
+  });
 
   const admin = await prisma.user.create({
     data: {
       email: "superadmin@regional5.local",
       passwordHash: await bcrypt.hash("Regional5Admin!", 10),
       role: "SUPERADMIN",
+      roleId: superadminRole.id,
       fullName: "Super Admin R5",
       isOnline: true,
     },
@@ -231,6 +260,7 @@ async function main() {
         email: agent.email,
         passwordHash: await bcrypt.hash("Agente123!", 10),
         role: "AGENT",
+        roleId: agentRole.id,
         fullName: agent.fullName,
         isOnline: true,
         agentProfile: {

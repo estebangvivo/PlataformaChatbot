@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireApiUser } from "@/lib/auth";
+import { requireApiAdmin, requireApiUser } from "@/lib/auth";
 import { parseJson } from "@/lib/utils";
-import { ROLES } from "@/lib/constants";
+import { listDepartmentNames } from "@/lib/desk-roles";
 
 export async function GET() {
   const { error } = await requireApiUser();
   if (error) return error;
-  const rules = await prisma.routingRule.findMany({ orderBy: { priority: "desc" } });
+  const [rules, departments] = await Promise.all([
+    prisma.routingRule.findMany({ orderBy: { priority: "desc" } }),
+    listDepartmentNames(),
+  ]);
   return NextResponse.json({
+    departments,
     rules: rules.map((rule) => ({
       ...rule,
       keywords: parseJson<string[]>(rule.keywords, []),
@@ -17,11 +21,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { user, error } = await requireApiUser();
+  const { error } = await requireApiAdmin();
   if (error) return error;
-  if (user.role !== ROLES.SUPERADMIN) {
-    return NextResponse.json({ error: "Solo SuperAdmin" }, { status: 403 });
-  }
   const body = (await request.json()) as {
     intent?: string;
     department?: string;
@@ -43,11 +44,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const { user, error } = await requireApiUser();
+  const { error } = await requireApiAdmin();
   if (error) return error;
-  if (user.role !== ROLES.SUPERADMIN) {
-    return NextResponse.json({ error: "Solo SuperAdmin" }, { status: 403 });
-  }
   const body = (await request.json()) as {
     id?: string;
     isActive?: boolean;
@@ -71,11 +69,8 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const { user, error } = await requireApiUser();
+  const { error } = await requireApiAdmin();
   if (error) return error;
-  if (user.role !== ROLES.SUPERADMIN) {
-    return NextResponse.json({ error: "Solo SuperAdmin" }, { status: 403 });
-  }
   const { id } = (await request.json()) as { id?: string };
   if (!id) return NextResponse.json({ error: "Falta id" }, { status: 400 });
   await prisma.routingRule.delete({ where: { id } });

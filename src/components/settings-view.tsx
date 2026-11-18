@@ -203,6 +203,11 @@ export function SettingsView() {
           regional5.com.ar. Si cambiás de proveedor de IA, conviene{" "}
           <strong>Revisar ahora</strong> en Base de conocimiento para regenerar embeddings.
         </p>
+        <p>
+          <strong>Agenda:</strong> en el menú Agenda un administrador conecta el Google Calendar
+          de la Regional. Client ID y secreto se pueden guardar ahí o en{" "}
+          <code>GOOGLE_CALENDAR_CLIENT_ID</code> / <code>GOOGLE_CALENDAR_CLIENT_SECRET</code>.
+        </p>
       </Card>
     </div>
   );

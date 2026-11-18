@@ -6,6 +6,7 @@ type RealtimeEvent = {
     | "message.created"
     | "conversation.assigned"
     | "desk.notify"
+    | "team.chat"
     | "heartbeat";
   payload?: unknown;
 };

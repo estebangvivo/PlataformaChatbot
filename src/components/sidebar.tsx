@@ -5,12 +5,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen,
+  CalendarDays,
   ClipboardList,
   ContactRound,
   LayoutDashboard,
   LogOut,
   Menu,
   MessageCircle,
+  MessagesSquare,
   Route,
   Settings,
   Smartphone,
@@ -24,9 +26,11 @@ import { clearAwayPreference, usePresence } from "@/components/presence-ping";
 const LINKS = [
   { href: "/dashboard", label: "Tablero", icon: LayoutDashboard },
   { href: "/inbox", label: "Inbox WhatsApp", icon: MessageCircle },
+  { href: "/chat", label: "Chat interno", icon: MessagesSquare },
+  { href: "/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/informes", label: "Informes", icon: ClipboardList },
   { href: "/contactos", label: "Personas", icon: ContactRound },
-  { href: "/agentes", label: "Agentes", icon: UserCog },
+  { href: "/agentes", label: "Agentes y roles", icon: UserCog },
   { href: "/enrutamiento", label: "Enrutamiento", icon: Route },
   { href: "/conocimiento", label: "Base de conocimiento", icon: BookOpen },
   { href: "/usuarios", label: "Usuarios", icon: Users, admin: true },
@@ -36,9 +40,11 @@ const LINKS = [
 
 export function Sidebar({
   role,
+  isAdmin = false,
   fullName,
 }: {
   role: string;
+  isAdmin?: boolean;
   fullName: string;
 }) {
   const pathname = usePathname();
@@ -118,7 +124,7 @@ export function Sidebar({
           </button>
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {LINKS.filter((link) => !link.admin || role === "SUPERADMIN").map((link) => {
+          {LINKS.filter((link) => !link.admin || isAdmin).map((link) => {
             const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
             const Icon = link.icon;
             return (
@@ -131,7 +137,8 @@ export function Sidebar({
                 )}
               >
                 <Icon size={16} />
-                {link.label}
+                <span className="flex-1 truncate">{link.label}</span>
+                {link.href === "/chat" ? <TeamChatBadge /> : null}
               </Link>
             );
           })}
@@ -158,5 +165,35 @@ export function Sidebar({
         </div>
       </aside>
     </>
+  );
+}
+
+function TeamChatBadge() {
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      const res = await fetch("/api/team-chat/threads");
+      if (!res.ok || cancelled) return;
+      const data = (await res.json()) as { unreadTotal?: number };
+      if (!cancelled) setUnread(data.unreadTotal ?? 0);
+    }
+    void load();
+    const onUpdate = () => void load();
+    window.addEventListener("r5-team-chat", onUpdate);
+    const id = setInterval(load, 30_000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("r5-team-chat", onUpdate);
+      clearInterval(id);
+    };
+  }, []);
+
+  if (!unread) return null;
+  return (
+    <span className="grid h-5 min-w-5 place-items-center rounded-full bg-clay px-1 text-[10px] font-semibold text-white">
+      {unread > 9 ? "9+" : unread}
+    </span>
   );
 }

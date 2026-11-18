@@ -9,7 +9,13 @@ function createPrisma() {
 }
 
 function isStaleClient(client: PrismaClient | undefined) {
-  return !client || typeof (client as { deskEvent?: unknown }).deskEvent === "undefined";
+  return (
+    !client ||
+    typeof (client as { deskEvent?: unknown }).deskEvent === "undefined" ||
+    typeof (client as { role?: unknown }).role === "undefined" ||
+    typeof (client as { teamThread?: unknown }).teamThread === "undefined" ||
+    typeof (client as { deskRole?: unknown }).deskRole === "undefined"
+  );
 }
 
 export const prisma = isStaleClient(globalForPrisma.prisma)

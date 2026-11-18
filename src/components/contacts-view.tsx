@@ -1,10 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { MessageCircle } from "lucide-react";
+import { Download, MessageCircle, Plus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/input";
@@ -24,13 +24,17 @@ type Contact = {
 };
 
 export function ContactsView() {
+  const router = useRouter();
   const params = useSearchParams();
+  const [starting, setStarting] = useState(false);
   const [query, setQuery] = useState("");
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activeId, setActiveId] = useState<string | null>(params.get("id"));
   const [form, setForm] = useState<ContactProfile>(EMPTY_PROFILE);
   const [displayName, setDisplayName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   async function load(q = query) {
     const res = await fetch(`/api/contacts${q ? `?q=${encodeURIComponent(q)}` : ""}`);
@@ -88,17 +92,90 @@ export function ContactsView() {
     await load();
   }
 
+  async function importExcel(file: File) {
+    setImporting(true);
+    const form = new FormData();
+    form.set("file", file);
+    try {
+      const res = await fetch("/api/contacts/import", { method: "POST", body: form });
+      const data = (await res.json()) as {
+        error?: string;
+        created?: number;
+        updated?: number;
+        skipped?: number;
+        errors?: Array<{ line: number; telefono: string; error: string }>;
+      };
+      if (!res.ok) {
+        toast.error(data.error ?? "No se pudo importar");
+        return;
+      }
+      const created = data.created ?? 0;
+      const updated = data.updated ?? 0;
+      const failed = data.errors?.length ?? 0;
+      toast.success(
+        `Importados: ${created} nuevos, ${updated} actualizados` +
+          (failed ? ` · ${failed} con error` : ""),
+      );
+      if (data.errors?.length) {
+        toast.error(data.errors.slice(0, 3).map((row) => `Fila ${row.line}: ${row.error}`).join(" · "));
+      }
+      await load();
+    } catch {
+      toast.error("No se pudo leer el Excel");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function startChat() {
+    if (!active) return;
+    setStarting(true);
+    const res = await fetch("/api/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: active.whatsappPhone, name: active.userName }),
+    });
+    const data = (await res.json()) as { error?: string; conversation?: { id: string } };
+    setStarting(false);
+    if (!res.ok || !data.conversation) {
+      toast.error(data.error ?? "No se pudo abrir el chat");
+      return;
+    }
+    router.push(`/inbox?id=${data.conversation.id}`);
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-serif text-3xl sm:text-4xl">Personas</h1>
           <p className="max-w-2xl text-ink/60">
-            Datos que el bot va aprendiendo de quienes escriben. Podés completarlos o corregirlos
-            a mano; el bot los usa en los próximos mensajes.
+            Datos que el bot va aprendiendo de quienes escriben. Descargá el Excel, completalo y
+            volvelo a subir: se suman a la agenda y se actualizan las fichas ya existentes.
           </p>
         </div>
-        <p className="text-sm text-ink/50">{contacts.length} contactos</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm text-ink/50">{contacts.length} contactos</p>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="hidden"
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) await importExcel(file);
+            }}
+          />
+          <Button variant="outline" asChild>
+            <a href="/api/contacts/template">
+              <Download size={14} /> Descargar Excel
+            </a>
+          </Button>
+          <Button variant="outline" disabled={importing} onClick={() => fileRef.current?.click()}>
+            <Upload size={14} /> {importing ? "Importando…" : "Importar Excel"}
+          </Button>
+        </div>
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
@@ -139,7 +216,9 @@ export function ContactsView() {
               </button>
             ))}
             {contacts.length === 0 ? (
-              <p className="p-4 text-sm text-ink/50">Todavía no hay personas. Usá el simulador o WhatsApp.</p>
+              <p className="p-4 text-sm text-ink/50">
+                Todavía no hay personas. Importá el Excel, usá el simulador o esperá un WhatsApp.
+              </p>
             ) : null}
           </div>
         </Card>
@@ -152,11 +231,16 @@ export function ContactsView() {
                 <h2 className="font-serif text-2xl">{active.userName || "Sin nombre"}</h2>
                 <p className="text-sm text-ink/50">{formatPhone(active.whatsappPhone)}</p>
               </div>
-              <Button asChild variant="outline" size="sm">
-                <Link href={`/inbox?id=${active.id}`}>
-                  <MessageCircle size={14} /> Ver en inbox
-                </Link>
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" onClick={startChat} disabled={starting}>
+                  <Plus size={14} /> Iniciar chat
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/inbox?id=${active.id}`}>
+                    <MessageCircle size={14} /> Ver en inbox
+                  </Link>
+                </Button>
+              </div>
             </div>
 
             <form onSubmit={onSave} className="grid gap-3 md:grid-cols-2">

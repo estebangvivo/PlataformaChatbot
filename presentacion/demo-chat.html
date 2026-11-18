@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Demo de un chat · CAPC Regional 5</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #2A1233;
+      --pine: #542460;
+      --moss: #703C78;
+      --clay: #8A3F98;
+      --sand: #F4ECF7;
+      --paper: #FBF8FC;
+      --line: #D7C8DE;
+      --wa: #d9fdd3;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: #111; }
+    body { font-family: Figtree, system-ui, sans-serif; color: var(--ink); }
+    .slide {
+      width: 1920px;
+      height: 1080px;
+      position: relative;
+      overflow: hidden;
+      background: var(--paper);
+    }
+    .slide::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 12% -8%, rgba(112, 60, 120, 0.12), transparent 34%),
+        radial-gradient(circle at 92% 0%, rgba(84, 36, 96, 0.12), transparent 30%);
+      pointer-events: none;
+    }
+    .serif { font-family: "Source Serif 4", Georgia, serif; }
+    .cover {
+      background: linear-gradient(122deg, #5C2868 0%, #703C78 34%, #542460 62%, #6C307C 82%, #743884 100%);
+      color: var(--sand);
+    }
+    .cover::before {
+      background:
+        linear-gradient(rgba(244,236,247,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(244,236,247,.08) 1px, transparent 1px);
+      background-size: 36px 36px;
+    }
+    .pad { position: relative; z-index: 1; padding: 72px 80px 64px; height: 100%; }
+    .kicker {
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--moss);
+    }
+    .cover .kicker { color: rgba(244,236,247,.7); }
+    h1 { font-size: 64px; line-height: 1.08; font-weight: 600; }
+    h2 { font-size: 42px; line-height: 1.12; font-weight: 600; }
+    .lead { font-size: 22px; line-height: 1.45; color: rgba(42,18,51,.7); max-width: 720px; }
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 520px;
+      gap: 64px;
+      height: 100%;
+      align-items: center;
+    }
+    .step {
+      display: inline-block;
+      background: var(--pine);
+      color: var(--sand);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      margin-bottom: 18px;
+    }
+    .note { margin-top: 28px; font-size: 18px; line-height: 1.45; color: rgba(42,18,51,.62); max-width: 640px; }
+    .phone {
+      width: 420px;
+      height: 860px;
+      background: #111;
+      border-radius: 42px;
+      padding: 12px;
+      box-shadow: 0 40px 80px -28px rgba(42,18,51,.55);
+      justify-self: end;
+    }
+    .screen {
+      height: 100%;
+      background: #ece5dd;
+      border-radius: 32px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .wa-top {
+      background: var(--pine);
+      color: var(--sand);
+      padding: 16px 16px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: rgba(255,255,255,.16);
+      display: grid; place-items: center;
+      font-weight: 700; font-size: 14px;
+    }
+    .wa-top p { font-size: 16px; font-weight: 600; }
+    .wa-top span { font-size: 12px; color: rgba(244,236,247,.7); }
+    .thread {
+      flex: 1;
+      padding: 16px 14px 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background:
+        linear-gradient(rgba(84,36,96,.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(84,36,96,.05) 1px, transparent 1px);
+      background-size: 22px 22px;
+      background-color: #efe8e0;
+    }
+    .bubble {
+      max-width: 82%;
+      padding: 9px 12px 8px;
+      border-radius: 14px;
+      font-size: 14.5px;
+      line-height: 1.38;
+      box-shadow: 0 1px 1px rgba(0,0,0,.08);
+      white-space: pre-wrap;
+    }
+    .who { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; opacity: .55; margin-bottom: 4px; font-weight: 700; }
+    .time { font-size: 10px; opacity: .45; text-align: right; margin-top: 4px; }
+    .user { align-self: flex-end; background: var(--wa); border-bottom-right-radius: 4px; }
+    .bot { align-self: flex-start; background: #fff; border-bottom-left-radius: 4px; }
+    .agent { align-self: flex-start; background: var(--clay); color: #fff; border-bottom-left-radius: 4px; }
+    .agent .who, .agent .time { color: rgba(255,255,255,.75); opacity: 1; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .chip {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .chip.on { background: var(--pine); color: var(--sand); border-color: var(--pine); }
+    .typing {
+      align-self: flex-start;
+      background: #fff;
+      border-radius: 14px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: rgba(42,18,51,.5);
+    }
+    .dots span {
+      display: inline-block;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #9a8aa0; margin-right: 3px;
+    }
+    .composer {
+      background: #f0e9e2;
+      padding: 10px;
+      display: flex; gap: 8px; align-items: center;
+    }
+    .composer div {
+      flex: 1; height: 38px; border-radius: 999px; background: #fff;
+      display: flex; align-items: center; padding: 0 14px;
+      font-size: 13px; color: #888;
+    }
+    .send {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--pine); color: #fff;
+      display: grid; place-items: center; font-size: 11px; font-weight: 700;
+    }
+    .desk {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 28px 70px -36px rgba(42,18,51,.5);
+      height: 780px;
+    }
+    .desk .bar {
+      height: 36px; background: var(--sand); border-bottom: 1px solid var(--line);
+      display: flex; align-items: center; gap: 7px; padding: 0 14px;
+    }
+    .desk .bar i { width: 10px; height: 10px; border-radius: 50%; display: block; }
+    .inbox {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      height: 744px;
+    }
+    .list { border-right: 1px solid var(--line); padding: 12px; background: #fff; }
+    .row {
+      display: flex; gap: 10px; align-items: center;
+      padding: 10px; border-radius: 12px; background: var(--sand);
+    }
+    .badge {
+      font-size: 10px; font-weight: 700; letter-spacing: .04em;
+      background: var(--clay); color: #fff; border-radius: 999px; padding: 3px 8px;
+    }
+    .chatpane { background: #efe8e0; display: flex; flex-direction: column; }
+    .chatpane header {
+      background: #fff; border-bottom: 1px solid var(--line);
+      padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .footer { position: absolute; left: 80px; right: 80px; bottom: 32px; font-size: 13px; color: rgba(42,18,51,.4); display: flex; justify-content: space-between; }
+  </style>
+</head>
+<body>
+
+<section class="slide cover">
+  <div class="pad" style="display:flex;flex-direction:column;justify-content:space-between;">
+    <p class="kicker">Demo de un chat · CAPC Regional 5</p>
+    <div>
+      <p style="letter-spacing:.22em;text-transform:uppercase;font-size:16px;font-weight:600;color:#E0C4E8;">Villa María · WhatsApp</p>
+      <h1 class="serif" style="max-width:1280px;margin-top:16px;">Un matriculado escribe.<br>El bot responde. La mesa entra si hace falta.</h1>
+      <p style="margin-top:28px;max-width:820px;font-size:24px;line-height:1.5;color:rgba(243,237,227,.82);">
+        Recorrido de un caso real: horario de sede, pedido de tesorería y derivación a un agente humano en el mismo hilo.
+      </p>
+    </div>
+    <p style="color:rgba(243,237,227,.55);">Colegio de Arquitectos · Regional 5</p>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="pad layout">
+    <div>
+      <p class="step">PASO 1</p>
+      <h2 class="serif">El matriculado abre WhatsApp</h2>
+      <p class="lead" style="margin-top:16px;">No entra a la web. Escribe al número de Regional 5, como hace siempre.</p>
+      <p class="note">El simulador interno muestra exactamente el mismo chat que vería por WhatsApp.</p>
+    </div>
+    <div class="phone"><div class="screen">
+      <div class="wa-top">
+        <div class="avatar">R5</div>
+        <div><p>Regional 5</p><span>asistente virtual</span></div>
+      </div>
+      <div class="thread"></div>
+      <div class="composer"><div>Escribí un mensaje…</div><div class="send">➤</div></div>
+    </div></div>
+  </div>
+  <div class="footer"><span>CAPC Regional 5 · Ejemplo de chat</span><span>02</span></div>
+</section>
+
+<section class="slide">
+  <div class="pad layout">
+    <div>
+      <p class="step">PASO 2</p>
+      <h2 class="serif">Saluda. El bot ofrece un menú</h2>
+      <p class="lead" style="margin-top:16px;">Con un “hola” no inventa: muestra las consultas más frecuentes y deja escribir cualquier otra.</p>
+    </div>
+    <div class="phone"><div class="screen">
+      <div class="wa-top"><div class="avatar">R5</div><div><p>Regional 5</p><span>asistente virtual</span></div></div>
+      <div class="thread">
+        <div class="bubble user"><div class="who">Vos</div>Hola<div class="time">18:02</div></div>
+        <div class="bubble bot">
+          <div class="who">Bot Regional 5</div>
+          Hola, soy el asistente virtual de Regional 5. Elegí una opción o escribí tu consulta.
+          <div class="chips">
+            <span class="chip">Horarios</span>
+            <span class="chip">Turnos</span>
+            <span class="chip">Firma digital</span>
+            <span class="chip">Hablar con mesa</span>
+          </div>
+          <div class="time">18:02</div>
+        </div>
+      </div>
+      <div class="composer"><div>Escribí un mensaje…</div><div class="send">➤</div></div>
+    </div></div>
+  </div>
+  <div class="footer"><span>CAPC Regional 5 · Ejemplo de chat</span><span>03</span></div>
+</section>
+
+<section class="slide">
+  <div class="pad layout">
+    <div>
+      <p class="step">PASO 3</p>
+      <h2 class="serif">Elige Horarios</h2>
+      <p class="lead" style="margin-top:16px;">El menú no es decorativo: cada botón se convierte en una pregunta institucional.</p>
+      <p class="note">En WhatsApp real aparece como lista interactiva. En el simulador, como botones.</p>
+    </div>
+    <div class="phone"><div class="screen">
+      <div class="wa-top"><div class="avatar">R5</div><div><p>Regional 5</p><span>asistente virtual</span></div></div>
+      <div class="thread">
+        <div class="bubble user"><div class="who">Vos</div>Hola<div class="time">18:02</div></div>
+        <div class="bubble bot">
+          <div class="who">Bot Regional 5</div>
+          Hola, soy el asistente virtual de Regional 5. Elegí una opción o escribí tu consulta.
+          <div class="chips">
+            <span class="chip on">Horarios</span>
+            <span class="chip">Turnos</span>
+            <span class="chip">Firma digital</span>
+            <span class="chip">Hablar con mesa</span>
+          </div>
+          <div class="time">18:02</div>
+        </div>
+      </div>
+      <div class="composer"><div>Horarios</div><div class="send">➤</div></div>
+    </div></div>
+  </div>
+  <div class="footer"><span>CAPC Regional 5 · Ejemplo de chat</span><span>04</span></div>
+</section>
+
+<section class="slide">
+  <div class="pad layout">
+    <div>
+      <p class="step">PASO 4</p>
+      <h2 class="serif">Responde con datos de la Regional</h2>
+      <p class="lead" style="margin-top:16px;">No busca en internet abierto. Usa las fichas institucionales: sede, horario y teléfonos oficiales.</p>
+      <p class="note">San Juan 1553, Villa María · lunes a viernes 8 a 13 hs.</p>
+    </div>
+    <div class="phone"><div class="screen">
+      <div class="wa-top"><div class="avatar">R5</div><div><p>Regional 5</p><span>asistente virtual</span></div></div>
+      <div class="thread">
+        <div class="bubble user"><div class="who">Vos</div>Hola<div class="time">18:02</div></div>
+        <div class="bubble bot"><div class="who">Bot Regional 5</div>Hola, soy el asistente virtual de Regional 5. Elegí una opción o escribí tu consulta.<div class="time">18:02</div></div>
+        <div class="bubble user"><div class="who">Vos</div>Horarios<div class="time">18:03</div></div>
+        <div class="bubble bot"><div class="who">Bot Regional 5</div>La sede de la Regional 5 queda en San Juan 1553, Villa María. Atendemos de lunes a viernes de 8 a 13 hs. Teléfonos: 0353 453-5425 y 0353 452-9174.<div class="time">18:03</div></div>
+      </div>
+      <div class="composer"><div>Escribí un mensaje…</div><div class="send">➤</div></div>
+    </div></div>
+  </div>
+  <div class="footer"><span>CAPC Regional 5 · Ejemplo de chat</span><span>05</span></div>
+</section>
+
+<section class="slide">
+  <div class="pad layout">
+    <div>
+      <p class="step">PASO 5</p>
+      <h2 class="serif">El tema ya no es un FAQ</h2>
+      <p class="lead" style="margin-top:16px;">Pide tesorería: una deuda puntual. Eso no lo cierra una ficha. Hay que pasar a una persona.</p>
+    </div>
+    <div class="phone"><div class="screen">
+      <div class="wa-top"><div class="avatar">R5</div><div><p>Regional 5</p><span>asistente virtual</span></div></div>
+      <div class="thread">
+        <div class="bubble user"><div class="who">Vos</div>Horarios<div class="time">18:03</div></div>
+        <div class="bubble bot"><div class="who">Bot Regional 5</div>La sede de la Regional 5 queda en San Juan 1553, Villa María. Atendemos de lunes a viernes de 8 a 13 hs. Teléfonos: 0353 453-5425 y 0353 452-9174.<div class="time">18:03</div></div>
+        <div class="bubble user"><div class="who">Vos</div>Tengo una deuda de habilitación, quiero hablar con Tesorería<div class="time">18:04</div></div>
+        <div class="typing"><span class="dots"><span></span><span></span><span></span></span> el bot está escribiendo…</div>
+      </div>
+      <div class="composer"><div>Escribí un mensaje…</div><div class="send">➤</div></div>
+    </div></div>
+  </div>
+  <div class="footer"><span>CAPC Regional 5 · Ejemplo de chat</span><span>06</span></div>
+</section>
+
+<section class="slide">
+  <div class="pad layout">
+    <div>
+      <p class="step">PASO 6</p>
+      <h2 class="serif">Nadie de mesa está en línea</h2>
+      <p class="lead" style="margin-top:16px;">No deja el chat colgado ni promete un humano que no está. Sigue el bot y avisa que va a notificar.</p>
+    </div>
+    <div class="phone"><div class="screen">
+      <div class="wa-top"><div class="avatar">R5</div><div><p>Regional 5</p><span>asistente virtual</span></div></div>
+      <div class="thread">
+        <div class="bubble bot"><div class="who">Bot Regional 5</div>La sede de la Regional 5 queda en San Juan 1553, Villa María. Atendemos de lunes a viernes de 8 a 13 hs. Teléfonos: 0353 453-5425 y 0353 452-9174.<div class="time">18:03</div></div>
+        <div class="bubble user"><div class="who">Vos</div>Tengo una deuda de habilitación, quiero hablar con Tesorería<div class="time">18:04</div></div>
+        <div class="bubble bot"><div class="who">Bot Regional 5</div>Ahora no hay agentes conectados. Seguí hablando conmigo y te ayudo. Te aviso cuando alguien de mesa se conecte.<div class="time">18:04</div></div>
+      </div>
+      <div class="composer"><div>Escribí un mensaje…</div><div class="send">➤</div></div>
+    </div></div>
+  </div>
+  <div class="footer"><span>CAPC Regional 5 · Ejemplo de chat</span><span>07</span></div>
+</section>
+
+<section class="slide">
+  <div class="pad layout">
+    <div>
+      <p class="step">PASO 7</p>
+      <h2 class="serif">Tesorería se conecta</h2>
+      <p class="lead" style="margin-top:16px;">Marcos marca “Estoy online”. El matriculado recibe el aviso en el mismo WhatsApp. El inbox también se entera.</p>
+    </div>
+    <div class="phone"><div class="screen">
+      <div class="wa-top"><div class="avatar">R5</div><div><p>Regional 5</p><span>asistente virtual</span></div></div>
+      <div class="thread">
+        <div class="bubble user"><div class="who">Vos</div>Tengo una deuda de habilitación, quiero hablar con Tesorería<div class="time">18:04</div></div>
+        <div class="bubble bot"><div class="who">Bot Regional 5</div>Ahora no hay agentes conectados. Seguí hablando conmigo y te ayudo. Te aviso cuando alguien de mesa se conecte.<div class="time">18:04</div></div>
+        <div class="bubble bot"><div class="who">Bot Regional 5</div>Se conectó Marcos Tesorería. Si seguís queriendo hablar con mesa, respondé “sí” y te derivo.<div class="time">18:11</div></div>
+      </div>
+      <div class="composer"><div>Escribí un mensaje…</div><div class="send">➤</div></div>
+    </div></div>
+  </div>
+  <div class="footer"><span>CAPC Regional 5 · Ejemplo de chat</span><span>08</span></div>
+</section>
+
+<section class="slide">
+  <div class="pad layout">
+    <div>
+      <p class="step">PASO 8</p>
+      <h2 class="serif">Confirma y el bot cede el hilo</h2>
+      <p class="lead" style="margin-top:16px;">Un “sí” alcanza. El estado pasa de bot a atención humana. No se abre otro número ni otro chat.</p>
+    </div>
+    <div class="phone"><div class="screen">
+      <div class="wa-top"><div class="avatar">MT</div><div><p>Regional 5</p><span>Marcos · Tesorería</span></div></div>
+      <div class="thread">
+        <div class="bubble bot"><div class="who">Bot Regional 5</div>Se conectó Marcos Tesorería. Si seguís queriendo hablar con mesa, respondé “sí” y te derivo.<div class="time">18:11</div></div>
+        <div class="bubble user"><div class="who">Vos</div>Sí<div class="time">18:11</div></div>
+        <div class="bubble bot"><div class="who">Bot Regional 5</div>Te dejo con Marcos Tesorería de Tesorería. En un rato te escriben por acá.<div class="time">18:11</div></div>
+      </div>
+      <div class="composer"><div>Escribí un mensaje…</div><div class="send">➤</div></div>
+    </div></div>
+  </div>
+  <div class="footer"><span>CAPC Regional 5 · Ejemplo de chat</span><span>09</span></div>
+</section>
+
+<section class="slide">
+  <div class="pad" style="display:grid;grid-template-columns:1fr 1.15fr;gap:48px;align-items:center;height:100%;">
+    <div>
+      <p class="step">PASO 9</p>
+      <h2 class="serif">La mesa lo ve en el Inbox</h2>
+      <p class="lead" style="margin-top:16px;">El mismo teléfono, el historial completo y el contexto: pidió Tesorería por una deuda de habilitación.</p>
+      <p class="note">Estados: bot → pendiente/humano. Marcos toma el control y escribe como Regional 5.</p>
+    </div>
+    <div class="desk">
+      <div class="bar"><i style="background:#E25B4A"></i><i style="background:#E3B341"></i><i style="background:#62C554"></i></div>
+      <div class="inbox">
+        <div class="list">
+          <p style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#8a7a90;margin:4px 8px 10px;">CHATS</p>
+          <div class="row">
+            <div class="avatar" style="background:var(--pine);color:#fff;width:36px;height:36px;font-size:12px;">AP</div>
+            <div style="min-width:0;">
+              <p style="font-size:13px;font-weight:600;">Arq. Prueba</p>
+              <p style="font-size:11px;color:#7a6a80;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Sí</p>
+            </div>
+          </div>
+        </div>
+        <div class="chatpane">
+          <header>
+            <div>
+              <p style="font-weight:600;">Arq. Prueba</p>
+              <p style="font-size:12px;color:#7a6a80;">+54 9 353 411 1222 · Tesorería</p>
+            </div>
+            <span class="badge">HUMANO</span>
+          </header>
+          <div class="thread" style="height:100%;">
+            <div class="bubble bot"><div class="who">Bot</div>Ahora no hay agentes conectados. Seguí hablando conmigo y te ayudo. Te aviso cuando alguien de mesa se conecte.</div>
+            <div class="bubble bot"><div class="who">Bot</div>Se conectó Marcos Tesorería. Si seguís queriendo hablar con mesa, respondé “sí” y te derivo.</div>
+            <div class="bubble user"><div class="who">WhatsApp</div>Sí</div>
+            <div class="bubble bot"><div class="who">Bot</div>Te dejo con Marcos Tesorería de Tesorería. En un rato te escriben por acá.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span>CAPC Regional 5 · Ejemplo de chat</span><span>10</span></div>
+</section>
+
+<section class="slide">
+  <div class="pad layout">
+    <div>
+      <p class="step">PASO 10</p>
+      <h2 class="serif">El agente escribe en el mismo WhatsApp</h2>
+      <p class="lead" style="margin-top:16px;">Para el matriculado no cambió nada: sigue siendo el chat de Regional 5. Ahora responde una persona de Tesorería.</p>
+    </div>
+    <div class="phone"><div class="screen">
+      <div class="wa-top"><div class="avatar">MT</div><div><p>Regional 5</p><span>Marcos · Tesorería · en línea</span></div></div>
+      <div class="thread">
+        <div class="bubble bot"><div class="who">Bot Regional 5</div>Te dejo con Marcos Tesorería de Tesorería. En un rato te escriben por acá.<div class="time">18:11</div></div>
+        <div class="bubble agent"><div class="who">Agente</div>Hola, soy Marcos de Tesorería. Decime si es habilitación anual, una boleta o una deuda y lo vemos en este mismo chat.<div class="time">18:12</div></div>
+        <div class="bubble user"><div class="who">Vos</div>Es la habilitación 2026, no me figura paga<div class="time">18:12</div></div>
+      </div>
+      <div class="composer"><div>Escribí un mensaje…</div><div class="send">➤</div></div>
+    </div></div>
+  </div>
+  <div class="footer"><span>CAPC Regional 5 · Ejemplo de chat</span><span>11</span></div>
+</section>
+
+<section class="slide cover">
+  <div class="pad" style="display:flex;flex-direction:column;justify-content:space-between;">
+    <p class="kicker">Qué se vio en un solo hilo</p>
+    <div>
+      <h1 class="serif" style="max-width:1300px;">Bot para lo rutinario.<br>Persona para el caso.</h1>
+      <p style="margin-top:32px;max-width:860px;font-size:24px;line-height:1.5;color:rgba(243,237,227,.82);">
+        1. Horario y sede, al instante, con la ficha institucional.<br>
+        2. Pedido de Tesorería: el bot no inventa un saldo.<br>
+        3. Si no hay nadie, avisa. Cuando Marcos se conecta, ofrece derivar.<br>
+        4. Un “sí” deja el mismo WhatsApp en manos de la mesa.
+      </p>
+    </div>
+    <p style="color:rgba(243,237,227,.55);">Colegio de Arquitectos · Regional 5 · Villa María</p>
+  </div>
+</section>
+
+</body>
+</html>

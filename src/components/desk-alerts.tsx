@@ -12,6 +12,15 @@ type DeskNotify = {
   kind?: "assign" | "message";
 };
 
+type TeamChatNotify = {
+  threadId: string;
+  memberIds: string[];
+  senderId: string;
+  senderName: string;
+  preview: string;
+  title: string;
+};
+
 export function DeskAlerts() {
   const router = useRouter();
 
@@ -36,8 +45,27 @@ export function DeskAlerts() {
         return;
       }
       source.onmessage = (event) => {
-        const parsed = JSON.parse(event.data) as { type?: string; payload?: DeskNotify };
-        if (parsed.type !== "desk.notify" || !parsed.payload) return;
+        const parsed = JSON.parse(event.data) as {
+          type?: string;
+          payload?: DeskNotify | TeamChatNotify;
+        };
+        if (parsed.type === "team.chat" && parsed.payload && "threadId" in parsed.payload) {
+          const payload = parsed.payload;
+          if (payload.senderId === myId) return;
+          if (!payload.memberIds.includes(myId)) return;
+          window.dispatchEvent(new Event("r5-team-chat"));
+          if (isViewingTeamThread(payload.threadId)) return;
+          toast(payload.senderName, {
+            description: payload.preview,
+            duration: 8_000,
+            action: {
+              label: "Abrir",
+              onClick: () => router.push(`/chat?id=${payload.threadId}`),
+            },
+          });
+          return;
+        }
+        if (parsed.type !== "desk.notify" || !parsed.payload || !("conversationId" in parsed.payload)) return;
         const payload = parsed.payload;
         if (payload.agentUserId !== myId) return;
 
@@ -82,4 +110,10 @@ function isViewingConversation(conversationId: string) {
   if (typeof window === "undefined") return false;
   const url = new URL(window.location.href);
   return url.pathname.includes("/inbox") && url.searchParams.get("id") === conversationId;
+}
+
+function isViewingTeamThread(threadId: string) {
+  if (typeof window === "undefined") return false;
+  const url = new URL(window.location.href);
+  return url.pathname.includes("/chat") && url.searchParams.get("id") === threadId;
 }

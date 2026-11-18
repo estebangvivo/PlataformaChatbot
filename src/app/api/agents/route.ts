@@ -1,19 +1,33 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireApiUser } from "@/lib/auth";
+import { hashPassword, requireApiAdmin, requireApiUser } from "@/lib/auth";
 import { parseJson } from "@/lib/utils";
 import { parseHours, describeHours, isWithinHours } from "@/lib/hours";
+import { DEFAULT_DEPARTMENT } from "@/lib/constants";
+import {
+  defaultWorkHours,
+  ensureSystemRoles,
+  findRoleBySlugOrId,
+  isAdminUser,
+  listDepartments,
+} from "@/lib/roles";
 
 export async function GET() {
-  const { error } = await requireApiUser();
+  const { user, error } = await requireApiUser();
   if (error) return error;
+  await ensureSystemRoles();
 
-  const agents = await prisma.agentProfile.findMany({
-    include: { user: true },
-    orderBy: { department: "asc" },
-  });
+  const [agents, departments] = await Promise.all([
+    prisma.agentProfile.findMany({
+      include: { user: { include: { accessRole: true } } },
+      orderBy: { department: "asc" },
+    }),
+    listDepartments(),
+  ]);
 
   return NextResponse.json({
+    isAdmin: isAdminUser(user),
+    departments,
     agents: agents.map((agent) => {
       const hours = parseHours(agent.workHours);
       return {
@@ -21,6 +35,8 @@ export async function GET() {
         userId: agent.userId,
         fullName: agent.user.fullName,
         email: agent.user.email,
+        role: agent.user.accessRole?.slug ?? agent.user.role,
+        roleName: agent.user.accessRole?.name ?? agent.user.role,
         isOnline: agent.user.isOnline && Date.now() - (agent.user.lastSeenAt?.getTime() ?? 0) < 3 * 60 * 1000,
         department: agent.department,
         keywords: parseJson<string[]>(agent.assignedKeywords, []),
@@ -30,6 +46,60 @@ export async function GET() {
         lastAssignedAt: agent.lastAssignedAt,
       };
     }),
+  });
+}
+
+export async function POST(request: Request) {
+  const { error } = await requireApiAdmin();
+  if (error) return error;
+  await ensureSystemRoles();
+
+  const body = (await request.json()) as {
+    email?: string;
+    password?: string;
+    fullName?: string;
+    role?: string;
+    department?: string;
+    keywords?: string[];
+    workHours?: { days: number[]; start: string; end: string };
+  };
+  if (!body.email || !body.password || !body.fullName) {
+    return NextResponse.json({ error: "Faltan nombre, email y contraseña" }, { status: 400 });
+  }
+
+  const email = body.email.toLowerCase().trim();
+  const clash = await prisma.user.findUnique({ where: { email } });
+  if (clash) return NextResponse.json({ error: "Ese email ya está en uso" }, { status: 409 });
+
+  const accessRole = (await findRoleBySlugOrId(body.role)) ?? (await findRoleBySlugOrId("AGENT"));
+  if (!accessRole) return NextResponse.json({ error: "Rol inválido" }, { status: 400 });
+
+  const hours = body.workHours ?? defaultWorkHours();
+  const created = await prisma.user.create({
+    data: {
+      email,
+      passwordHash: await hashPassword(body.password),
+      fullName: body.fullName.trim(),
+      role: accessRole.slug,
+      roleId: accessRole.id,
+      agentProfile: {
+        create: {
+          department: body.department?.trim() || DEFAULT_DEPARTMENT,
+          workHours: JSON.stringify(hours),
+          assignedKeywords: JSON.stringify(body.keywords ?? []),
+        },
+      },
+    },
+    include: { agentProfile: true },
+  });
+
+  return NextResponse.json({
+    agent: {
+      id: created.agentProfile?.id,
+      userId: created.id,
+      fullName: created.fullName,
+      email: created.email,
+    },
   });
 }
 
@@ -46,7 +116,7 @@ export async function PATCH(request: Request) {
 
   const profile = await prisma.agentProfile.findUnique({ where: { id: body.id } });
   if (!profile) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-  if (user.role !== "SUPERADMIN" && profile.userId !== user.id) {
+  if (!isAdminUser(user) && profile.userId !== user.id) {
     return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
 

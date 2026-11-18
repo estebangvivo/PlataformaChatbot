@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "./db";
-import type { Role } from "./constants";
+import { isAdminUser } from "./roles";
+import { ROLES, type Role } from "./constants";
 
 const COOKIE = "r5_session";
 const WEEK = 60 * 60 * 24 * 7;
@@ -83,7 +84,7 @@ export async function requireUser() {
   if (!session) return null;
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
-    include: { agentProfile: true },
+    include: { agentProfile: true, accessRole: true },
   });
   return user;
 }
@@ -95,3 +96,19 @@ export async function requireApiUser() {
   }
   return { user, error: null };
 }
+
+export async function requireApiAdmin() {
+  const { user, error } = await requireApiUser();
+  if (error || !user) {
+    return { user: null, error: error ?? Response.json({ error: "No autorizado" }, { status: 401 }) };
+  }
+  if (!isAdminUser(user)) {
+    return {
+      user,
+      error: Response.json({ error: "Solo un administrador puede hacer esto" }, { status: 403 }),
+    };
+  }
+  return { user, error: null };
+}
+
+export { isAdminUser, ROLES };
