@@ -10,6 +10,8 @@ dist
 .DS_Store
 prisma/dev.db
 prisma/dev.db-journal
+prisma/dev.db-shm
+prisma/dev.db-wal
 *.tsbuildinfo
 public/uploads/*
 !public/uploads/.gitkeep

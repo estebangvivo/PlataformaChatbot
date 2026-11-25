@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { readProfile } from "./personality";
 import { sendWhatsAppText } from "./whatsapp";
 import { emitDeskNotify, hub } from "./events";
+import { isDeskUserOnline } from "./routing";
 
 export async function subscribeAgentWait(conversationId: string, department?: string | null) {
   const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
@@ -20,7 +21,7 @@ export async function notifyWaitingConversations(agentUserId: string) {
     where: { id: agentUserId },
     include: { agentProfile: true },
   });
-  if (!agent?.isOnline) return 0;
+  if (!agent || !isDeskUserOnline(agent)) return 0;
 
   const department = agent.agentProfile?.department ?? null;
   const waiting = await prisma.conversation.findMany({

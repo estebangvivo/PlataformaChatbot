@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { notifyWaitingConversations } from "@/lib/waitlist";
+import { hub } from "@/lib/events";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const { user, error } = await requireApiUser();
@@ -15,6 +18,9 @@ export async function POST(request: Request) {
       ...(typeof body.isOnline === "boolean" ? { isOnline: body.isOnline } : {}),
     },
   });
+  if (previous?.isOnline !== updated.isOnline) {
+    hub.emitEvent({ type: "presence.updated", payload: { userId: updated.id, isOnline: updated.isOnline } });
+  }
   if (!previous?.isOnline && updated.isOnline) {
     await notifyWaitingConversations(updated.id);
   }

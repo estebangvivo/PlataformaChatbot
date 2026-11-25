@@ -36,14 +36,16 @@ export default function LoginPage() {
           <Suspense>
             <LoginForm />
           </Suspense>
-          <div className="mt-6 rounded-2xl bg-sand p-4 text-xs text-ink/70">
-            <p>
-              <strong>SuperAdmin:</strong> superadmin@regional5.local / Regional5Admin!
-            </p>
-            <p className="mt-1">
-              <strong>Agente:</strong> tesoreria@regional5.local / Agente123!
-            </p>
-          </div>
+          {process.env.NODE_ENV !== "production" ? (
+            <div className="mt-6 rounded-2xl bg-sand p-4 text-xs text-ink/70">
+              <p>
+                <strong>SuperAdmin:</strong> superadmin@regional5.local / Regional5Admin!
+              </p>
+              <p className="mt-1">
+                <strong>Agente:</strong> tesoreria@regional5.local / Agente123!
+              </p>
+            </div>
+          ) : null}
         </div>
       </section>
     </main>

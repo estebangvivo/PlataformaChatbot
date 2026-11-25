@@ -40,7 +40,7 @@ export async function matchRouting(text: string) {
   return best?.rule ?? null;
 }
 
-const ONLINE_STALE_MS = 3 * 60 * 1000;
+export const ONLINE_STALE_MS = 3 * 60 * 1000;
 
 export function isDeskUserOnline(user: { isOnline: boolean; lastSeenAt: Date | null }) {
   if (!user.isOnline) return false;

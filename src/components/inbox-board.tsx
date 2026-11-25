@@ -121,7 +121,10 @@ export function InboxBoard() {
       const cid = payload.payload?.conversationId ?? payload.payload?.id;
       if (cid) loadOne(cid);
     };
-    const ping = setInterval(loadAgents, 20_000);
+    const ping = setInterval(() => {
+      loadList();
+      loadAgents();
+    }, 12_000);
     return () => {
       es.close();
       clearInterval(ping);

@@ -4,6 +4,7 @@ import { hashPassword, requireApiAdmin, requireApiUser } from "@/lib/auth";
 import { parseJson } from "@/lib/utils";
 import { parseHours, describeHours, isWithinHours } from "@/lib/hours";
 import { DEFAULT_DEPARTMENT } from "@/lib/constants";
+import { isDeskUserOnline } from "@/lib/routing";
 import {
   defaultWorkHours,
   ensureSystemRoles,
@@ -37,12 +38,12 @@ export async function GET() {
         email: agent.user.email,
         role: agent.user.accessRole?.slug ?? agent.user.role,
         roleName: agent.user.accessRole?.name ?? agent.user.role,
-        isOnline: agent.user.isOnline && Date.now() - (agent.user.lastSeenAt?.getTime() ?? 0) < 3 * 60 * 1000,
+        isOnline: isDeskUserOnline(agent.user),
         department: agent.department,
         keywords: parseJson<string[]>(agent.assignedKeywords, []),
         workHours: hours,
         hoursLabel: describeHours(hours),
-        availableNow: agent.user.isOnline && isWithinHours(hours),
+        availableNow: isDeskUserOnline(agent.user) && isWithinHours(hours),
         lastAssignedAt: agent.lastAssignedAt,
       };
     }),

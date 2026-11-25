@@ -22,6 +22,9 @@ export const prisma = isStaleClient(globalForPrisma.prisma)
   ? createPrisma()
   : (globalForPrisma.prisma as PrismaClient);
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+globalForPrisma.prisma = prisma;
+
+void prisma
+  .$queryRawUnsafe("PRAGMA journal_mode=WAL;")
+  .then(() => prisma.$queryRawUnsafe("PRAGMA busy_timeout=5000;"))
+  .catch(() => undefined);

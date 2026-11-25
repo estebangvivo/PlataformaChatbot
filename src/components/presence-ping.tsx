@@ -23,12 +23,17 @@ function isAway() {
 }
 
 async function postPresence(isOnline?: boolean) {
-  await fetch("/api/presence", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(typeof isOnline === "boolean" ? { isOnline } : {}),
-    keepalive: true,
-  });
+  try {
+    const res = await fetch("/api/presence", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(typeof isOnline === "boolean" ? { isOnline } : {}),
+      keepalive: true,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 export function PresenceProvider({ children }: { children: ReactNode }) {
@@ -41,7 +46,14 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     const id = setInterval(() => {
       void postPresence(isAway() ? false : true);
     }, 45_000);
-    return () => clearInterval(id);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void postPresence(isAway() ? false : true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   const setAvailable = useCallback(async (next: boolean) => {

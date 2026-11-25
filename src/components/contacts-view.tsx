@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/badge";
-import { CONTACT_ROLES, EMPTY_PROFILE, type ContactProfile } from "@/lib/personality";
+import { CONTACT_ROLES, EMPTY_PROFILE, type ContactProfile } from "@/lib/contact-profile";
 import { cn, formatPhone, initials } from "@/lib/utils";
 
 type Contact = {

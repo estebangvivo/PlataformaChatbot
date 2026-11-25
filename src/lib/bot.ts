@@ -492,8 +492,10 @@ export async function sendAgentReply(params: {
       filename: params.media.filename || stored.filename,
       url: stored.url,
     };
-    await sendWhatsAppMedia(conversation.whatsappPhone, params.media, caption || undefined);
-  } else {
+    if (conversation.channel !== "simulator") {
+      await sendWhatsAppMedia(conversation.whatsappPhone, params.media, caption || undefined);
+    }
+  } else if (conversation.channel !== "simulator") {
     await sendWhatsAppText(conversation.whatsappPhone, caption);
   }
 

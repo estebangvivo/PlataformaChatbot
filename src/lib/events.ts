@@ -7,6 +7,7 @@ type RealtimeEvent = {
     | "conversation.assigned"
     | "desk.notify"
     | "team.chat"
+    | "presence.updated"
     | "heartbeat";
   payload?: unknown;
 };
@@ -21,10 +22,7 @@ const globalForHub = globalThis as unknown as { r5Hub?: Hub };
 
 export const hub = globalForHub.r5Hub ?? new Hub();
 hub.setMaxListeners(200);
-
-if (process.env.NODE_ENV !== "production") {
-  globalForHub.r5Hub = hub;
-}
+globalForHub.r5Hub = hub;
 
 export type DeskNotifyPayload = {
   agentUserId: string;

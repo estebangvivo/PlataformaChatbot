@@ -18,9 +18,35 @@ export function DashboardView() {
   const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {
-    fetch("/api/stats")
-      .then((r) => r.json())
-      .then(setStats);
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res = await fetch("/api/stats", { cache: "no-store" });
+        const data = (await res.json()) as Stats;
+        if (!cancelled && typeof data.conversations === "number") setStats(data);
+      } catch {
+        /* el tablero reintenta solo */
+      }
+    }
+
+    void load();
+    const es = new EventSource("/api/events");
+    es.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as { type?: string };
+        if (payload.type === "heartbeat") return;
+        void load();
+      } catch {
+        void load();
+      }
+    };
+    const poll = setInterval(load, 12_000);
+    return () => {
+      cancelled = true;
+      es.close();
+      clearInterval(poll);
+    };
   }, []);
 
   const cards = [

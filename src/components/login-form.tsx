@@ -9,8 +9,10 @@ import { clearAwayPreference } from "@/components/presence-ping";
 export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const [email, setEmail] = useState("superadmin@regional5.local");
-  const [password, setPassword] = useState("Regional5Admin!");
+  const [email, setEmail] = useState(
+    process.env.NODE_ENV === "production" ? "" : "superadmin@regional5.local",
+  );
+  const [password, setPassword] = useState(process.env.NODE_ENV === "production" ? "" : "Regional5Admin!");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 

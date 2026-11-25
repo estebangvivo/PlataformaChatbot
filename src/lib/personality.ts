@@ -1,31 +1,13 @@
 import { normalizeText, parseJson } from "./utils";
 import { wantsHuman } from "./routing";
+import {
+  CONTACT_ROLES,
+  EMPTY_PROFILE,
+  type ContactProfile,
+} from "./contact-profile";
 
-export type ContactProfile = {
-  firstName?: string;
-  lastName?: string;
-  locality?: string;
-  matricula?: string;
-  role?: string;
-  email?: string;
-  observations?: string;
-  interests: string[];
-  notes: string[];
-  lastGreetedOn?: string;
-  unansweredStreak: number;
-  lastTopic?: string;
-  awaiting?: string | null;
-  notifyOnAgent?: boolean;
-  notifyDepartment?: string | null;
-};
-
-export const EMPTY_PROFILE: ContactProfile = {
-  interests: [],
-  notes: [],
-  unansweredStreak: 0,
-};
-
-export const CONTACT_ROLES = ["matriculado", "arquitecto", "estudiante", "publico"] as const;
+export type { ContactProfile } from "./contact-profile";
+export { CONTACT_ROLES, EMPTY_PROFILE };
 
 const LOCALITIES = [
   "villa maría",
