@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen,
   CalendarDays,
+  ChevronDown,
   ClipboardList,
   ContactRound,
   LayoutDashboard,
@@ -19,24 +20,59 @@ import {
   UserCog,
   Users,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearAwayPreference, usePresence } from "@/components/presence-ping";
 
-const LINKS = [
-  { href: "/dashboard", label: "Tablero", icon: LayoutDashboard },
-  { href: "/inbox", label: "Inbox WhatsApp", icon: MessageCircle },
-  { href: "/chat", label: "Chat interno", icon: MessagesSquare },
-  { href: "/agenda", label: "Agenda", icon: CalendarDays },
-  { href: "/informes", label: "Informes", icon: ClipboardList },
-  { href: "/contactos", label: "Personas", icon: ContactRound },
-  { href: "/agentes", label: "Agentes y roles", icon: UserCog },
-  { href: "/enrutamiento", label: "Enrutamiento", icon: Route },
-  { href: "/conocimiento", label: "Base de conocimiento", icon: BookOpen },
-  { href: "/usuarios", label: "Usuarios", icon: Users, admin: true },
-  { href: "/simulador", label: "Simulador WA", icon: Smartphone },
-  { href: "/configuracion", label: "Configuración", icon: Settings },
+type NavLink = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  admin?: boolean;
+};
+
+const HOME: NavLink = { href: "/dashboard", label: "Tablero", icon: LayoutDashboard };
+
+const SECTIONS: { title: string; links: NavLink[] }[] = [
+  {
+    title: "Mesa",
+    links: [
+      { href: "/inbox", label: "Inbox WhatsApp", icon: MessageCircle },
+      { href: "/chat", label: "Chat interno", icon: MessagesSquare },
+      { href: "/agenda", label: "Agenda", icon: CalendarDays },
+      { href: "/informes", label: "Informes", icon: ClipboardList },
+    ],
+  },
+  {
+    title: "Directorio",
+    links: [
+      { href: "/contactos", label: "Personas", icon: ContactRound },
+      { href: "/agentes", label: "Agentes y roles", icon: UserCog },
+      { href: "/usuarios", label: "Usuarios", icon: Users, admin: true },
+    ],
+  },
+  {
+    title: "Chatbot",
+    links: [
+      { href: "/enrutamiento", label: "Enrutamiento", icon: Route },
+      { href: "/conocimiento", label: "Base de conocimiento", icon: BookOpen },
+      { href: "/simulador", label: "Simulador WA", icon: Smartphone },
+    ],
+  },
+  {
+    title: "Sistema",
+    links: [{ href: "/configuracion", label: "Configuración", icon: Settings }],
+  },
 ];
+
+function isActivePath(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function sectionForPath(pathname: string) {
+  return SECTIONS.find((section) => section.links.some((link) => isActivePath(pathname, link.href)))?.title ?? null;
+}
 
 export function Sidebar({
   role,
@@ -51,9 +87,11 @@ export function Sidebar({
   const router = useRouter();
   const { online, setAvailable } = usePresence();
   const [open, setOpen] = useState(false);
+  const [openSection, setOpenSection] = useState<string | null>(() => sectionForPath(pathname));
 
   useEffect(() => {
     setOpen(false);
+    setOpenSection(sectionForPath(pathname));
   }, [pathname]);
 
   useEffect(() => {
@@ -124,22 +162,34 @@ export function Sidebar({
           </button>
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {LINKS.filter((link) => !link.admin || isAdmin).map((link) => {
-            const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
-            const Icon = link.icon;
+          <NavItem link={HOME} pathname={pathname} />
+          {SECTIONS.map((section) => {
+            const links = section.links.filter((link) => !link.admin || isAdmin);
+            if (!links.length) return null;
+            const expanded = openSection === section.title;
+            const sectionActive = links.some((link) => isActivePath(pathname, link.href));
             return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition",
-                  active ? "bg-white/12 text-white" : "text-sand/70 hover:bg-white/6 hover:text-sand",
-                )}
-              >
-                <Icon size={16} />
-                <span className="flex-1 truncate">{link.label}</span>
-                {link.href === "/chat" ? <TeamChatBadge /> : null}
-              </Link>
+              <div key={section.title} className="pt-2">
+                <button
+                  type="button"
+                  aria-expanded={expanded}
+                  onClick={() => setOpenSection(expanded ? null : section.title)}
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-xl px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] transition",
+                    sectionActive ? "text-sand/80" : "text-sand/40 hover:text-sand/70",
+                  )}
+                >
+                  {section.title}
+                  <ChevronDown size={14} className={cn("shrink-0 transition-transform", expanded && "rotate-180")} />
+                </button>
+                {expanded ? (
+                  <div className="mt-0.5 space-y-0.5">
+                    {links.map((link) => (
+                      <NavItem key={link.href} link={link} pathname={pathname} />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             );
           })}
         </nav>
@@ -165,6 +215,24 @@ export function Sidebar({
         </div>
       </aside>
     </>
+  );
+}
+
+function NavItem({ link, pathname }: { link: NavLink; pathname: string }) {
+  const active = isActivePath(pathname, link.href);
+  const Icon = link.icon;
+  return (
+    <Link
+      href={link.href}
+      className={cn(
+        "flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition",
+        active ? "bg-white/12 text-white" : "text-sand/70 hover:bg-white/6 hover:text-sand",
+      )}
+    >
+      <Icon size={16} />
+      <span className="flex-1 truncate">{link.label}</span>
+      {link.href === "/chat" ? <TeamChatBadge /> : null}
+    </Link>
   );
 }
 
