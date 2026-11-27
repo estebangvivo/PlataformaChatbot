@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { readSessionFromRequest } from "@/lib/auth";
 
-const PUBLIC = ["/login", "/api/auth/login", "/api/webhook/whatsapp"];
+const PUBLIC = [
+  "/login",
+  "/api/auth/login",
+  "/api/auth/forgot",
+  "/api/auth/reset",
+  "/api/webhook/whatsapp",
+];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

@@ -4,6 +4,7 @@ import { hashPassword, requireApiAdmin } from "@/lib/auth";
 import { DEFAULT_DEPARTMENT } from "@/lib/constants";
 import { applyRoleToUser, findRoleBySlugOrId, isAdminUser } from "@/lib/roles";
 import { notifyWaitingConversations } from "@/lib/waitlist";
+import { parseNotifyPhone } from "@/lib/agent-notify";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, error } = await requireApiAdmin();
@@ -18,6 +19,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     department?: string;
     keywords?: string[];
     workHours?: { days: number[]; start: string; end: string };
+    notifyPhone?: string | null;
   };
 
   const existing = await prisma.user.findUnique({
@@ -60,14 +62,34 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
   }
 
-  if (existing.agentProfile && (body.keywords || body.workHours)) {
-    await prisma.agentProfile.update({
-      where: { userId: id },
-      data: {
-        ...(body.keywords ? { assignedKeywords: JSON.stringify(body.keywords) } : {}),
-        ...(body.workHours ? { workHours: JSON.stringify(body.workHours) } : {}),
-      },
-    });
+  if (existing.agentProfile && (body.keywords || body.workHours || body.notifyPhone !== undefined)) {
+    let notifyPhone: string | null | undefined;
+    if (body.notifyPhone !== undefined) {
+      try {
+        notifyPhone = parseNotifyPhone(body.notifyPhone);
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "WhatsApp de aviso inválido" },
+          { status: 400 },
+        );
+      }
+    }
+    try {
+      await prisma.agentProfile.update({
+        where: { userId: id },
+        data: {
+          ...(body.keywords ? { assignedKeywords: JSON.stringify(body.keywords) } : {}),
+          ...(body.workHours ? { workHours: JSON.stringify(body.workHours) } : {}),
+          ...(notifyPhone !== undefined ? { notifyPhone } : {}),
+        },
+      });
+    } catch (error) {
+      const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+      if (code === "P2002") {
+        return NextResponse.json({ error: "Ese WhatsApp ya está cargado en otro agente" }, { status: 409 });
+      }
+      throw error;
+    }
   }
 
   if (!existing.isOnline && updated.isOnline) {

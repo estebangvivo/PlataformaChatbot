@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordSettings } from "@/components/password-settings";
 
 type Provider = {
   id: string;
@@ -97,8 +98,10 @@ export function SettingsView() {
     <div className="space-y-6">
       <header>
         <h1 className="font-serif text-3xl sm:text-4xl">Configuración</h1>
-        <p className="text-ink/60">Elegí el modelo de IA del chatbot e integraciones.</p>
+        <p className="text-ink/60">Tu cuenta, el modelo de IA del chatbot e integraciones.</p>
       </header>
+
+      <PasswordSettings />
 
       <Card className="p-6">
         <h2 className="font-serif text-2xl">Inteligencia artificial</h2>
@@ -191,7 +194,10 @@ export function SettingsView() {
         <p>
           <strong>WhatsApp:</strong> cargá <code>WHATSAPP_ACCESS_TOKEN</code>,{" "}
           <code>WHATSAPP_PHONE_NUMBER_ID</code> y <code>WHATSAPP_VERIFY_TOKEN</code> en el{" "}
-          <code>.env</code>. El webhook es <code>/api/webhook/whatsapp</code>.
+          <code>.env</code>. El webhook es <code>/api/webhook/whatsapp</code>. Para avisar a un
+          agente offline cuando le derivan un chat, cargá su celular en Agentes y una plantilla
+          Utility en Meta (<code>WHATSAPP_AGENT_NOTIFY_TEMPLATE</code>, cuerpo con un parámetro: el
+          nombre del matriculado).
         </p>
         <p>
           <strong>Base de datos:</strong> por defecto SQLite (<code>prisma/dev.db</code>). Para

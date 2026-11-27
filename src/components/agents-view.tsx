@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { usePresence } from "@/components/presence-ping";
 import { DEFAULT_DEPARTMENT } from "@/lib/constants";
 import { DEFAULT_HOURS } from "@/lib/hours";
-import { cn } from "@/lib/utils";
+import { cn, formatPhone } from "@/lib/utils";
 
 type WorkHours = { days: number[]; start: string; end: string };
 
@@ -25,6 +25,7 @@ type Agent = {
   workHours: WorkHours;
   hoursLabel: string;
   availableNow: boolean;
+  notifyPhone: string | null;
 };
 
 type DeskRole = {
@@ -51,6 +52,7 @@ const emptyAgentForm = {
   password: "",
   department: DEFAULT_DEPARTMENT,
   keywords: "",
+  notifyPhone: "",
   workHours: { ...DEFAULT_HOURS, days: [...DEFAULT_HOURS.days] },
 };
 
@@ -105,6 +107,7 @@ export function AgentsView() {
       password: "",
       department: agent.department,
       keywords: agent.keywords.join(", "),
+      notifyPhone: agent.notifyPhone ?? "",
       workHours: agent.workHours,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -134,6 +137,7 @@ export function AgentsView() {
             department,
             keywords,
             workHours: agentForm.workHours,
+            notifyPhone: agentForm.notifyPhone,
             ...(agentForm.password.trim() ? { password: agentForm.password } : {}),
           }),
         });
@@ -152,11 +156,13 @@ export function AgentsView() {
           department,
           keywords,
           workHours: agentForm.workHours,
+          notifyPhone: agentForm.notifyPhone,
         }),
       });
       setSaving(false);
       if (!hoursRes.ok) {
-        toast.error("No se pudo guardar el horario");
+        const data = await hoursRes.json().catch(() => ({}));
+        toast.error(data.error ?? "No se pudo guardar el horario");
         return;
       }
       toast.success("Agente actualizado");
@@ -175,6 +181,7 @@ export function AgentsView() {
         department,
         keywords,
         workHours: agentForm.workHours,
+        notifyPhone: agentForm.notifyPhone,
       }),
     });
     setSaving(false);
@@ -395,6 +402,18 @@ export function AgentsView() {
                   </div>
                 </div>
                 <label className="block text-sm md:col-span-2">
+                  <span className="mb-1.5 block text-ink/70">WhatsApp de aviso</span>
+                  <Input
+                    value={agentForm.notifyPhone}
+                    onChange={(e) => setAgentForm({ ...agentForm, notifyPhone: e.target.value })}
+                    placeholder="351 555 1234"
+                    inputMode="tel"
+                  />
+                  <p className="mt-1 text-xs text-ink/50">
+                    Si está offline y le derivan un chat, le avisamos a este número. No hace falta el +54.
+                  </p>
+                </label>
+                <label className="block text-sm md:col-span-2">
                   <span className="mb-1 block text-ink/60">Palabras clave (coma)</span>
                   <Input
                     value={agentForm.keywords}
@@ -431,6 +450,11 @@ export function AgentsView() {
                   </Badge>
                 </div>
                 <p className="text-xs text-ink/50">{agent.hoursLabel}</p>
+                <p className="text-xs text-ink/55">
+                  {agent.notifyPhone
+                    ? `Aviso WA: ${formatPhone(agent.notifyPhone)}`
+                    : "Sin WhatsApp de aviso"}
+                </p>
                 {agent.keywords.length ? (
                   <p className="text-xs text-ink/55">{agent.keywords.join(" · ")}</p>
                 ) : null}

@@ -5,6 +5,7 @@ import { parseJson } from "@/lib/utils";
 import { parseHours, describeHours, isWithinHours } from "@/lib/hours";
 import { DEFAULT_DEPARTMENT } from "@/lib/constants";
 import { isDeskUserOnline } from "@/lib/routing";
+import { parseNotifyPhone } from "@/lib/agent-notify";
 import {
   defaultWorkHours,
   ensureSystemRoles,
@@ -45,6 +46,7 @@ export async function GET() {
         hoursLabel: describeHours(hours),
         availableNow: isDeskUserOnline(agent.user) && isWithinHours(hours),
         lastAssignedAt: agent.lastAssignedAt,
+        notifyPhone: agent.notifyPhone,
       };
     }),
   });
@@ -63,6 +65,7 @@ export async function POST(request: Request) {
     department?: string;
     keywords?: string[];
     workHours?: { days: number[]; start: string; end: string };
+    notifyPhone?: string;
   };
   if (!body.email || !body.password || !body.fullName) {
     return NextResponse.json({ error: "Faltan nombre, email y contraseña" }, { status: 400 });
@@ -76,23 +79,42 @@ export async function POST(request: Request) {
   if (!accessRole) return NextResponse.json({ error: "Rol inválido" }, { status: 400 });
 
   const hours = body.workHours ?? defaultWorkHours();
-  const created = await prisma.user.create({
-    data: {
-      email,
-      passwordHash: await hashPassword(body.password),
-      fullName: body.fullName.trim(),
-      role: accessRole.slug,
-      roleId: accessRole.id,
-      agentProfile: {
-        create: {
-          department: body.department?.trim() || DEFAULT_DEPARTMENT,
-          workHours: JSON.stringify(hours),
-          assignedKeywords: JSON.stringify(body.keywords ?? []),
+  let notifyPhone: string | null = null;
+  try {
+    notifyPhone = parseNotifyPhone(body.notifyPhone);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "WhatsApp de aviso inválido" },
+      { status: 400 },
+    );
+  }
+  let created;
+  try {
+    created = await prisma.user.create({
+      data: {
+        email,
+        passwordHash: await hashPassword(body.password),
+        fullName: body.fullName.trim(),
+        role: accessRole.slug,
+        roleId: accessRole.id,
+        agentProfile: {
+          create: {
+            department: body.department?.trim() || DEFAULT_DEPARTMENT,
+            workHours: JSON.stringify(hours),
+            assignedKeywords: JSON.stringify(body.keywords ?? []),
+            notifyPhone,
+          },
         },
       },
-    },
-    include: { agentProfile: true },
-  });
+      include: { agentProfile: true },
+    });
+  } catch (error) {
+    const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+    if (code === "P2002") {
+      return NextResponse.json({ error: "Ese WhatsApp ya está cargado en otro agente" }, { status: 409 });
+    }
+    throw error;
+  }
 
   return NextResponse.json({
     agent: {
@@ -112,6 +134,7 @@ export async function PATCH(request: Request) {
     department?: string;
     keywords?: string[];
     workHours?: { days: number[]; start: string; end: string };
+    notifyPhone?: string | null;
   };
   if (!body.id) return NextResponse.json({ error: "Falta id" }, { status: 400 });
 
@@ -121,13 +144,34 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
 
-  const updated = await prisma.agentProfile.update({
-    where: { id: body.id },
-    data: {
-      ...(body.department ? { department: body.department } : {}),
-      ...(body.keywords ? { assignedKeywords: JSON.stringify(body.keywords) } : {}),
-      ...(body.workHours ? { workHours: JSON.stringify(body.workHours) } : {}),
-    },
-  });
-  return NextResponse.json({ agent: updated });
+  let notifyPhone: string | null | undefined;
+  if (body.notifyPhone !== undefined) {
+    try {
+      notifyPhone = parseNotifyPhone(body.notifyPhone);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "WhatsApp de aviso inválido" },
+        { status: 400 },
+      );
+    }
+  }
+
+  try {
+    const updated = await prisma.agentProfile.update({
+      where: { id: body.id },
+      data: {
+        ...(body.department ? { department: body.department } : {}),
+        ...(body.keywords ? { assignedKeywords: JSON.stringify(body.keywords) } : {}),
+        ...(body.workHours ? { workHours: JSON.stringify(body.workHours) } : {}),
+        ...(notifyPhone !== undefined ? { notifyPhone } : {}),
+      },
+    });
+    return NextResponse.json({ agent: updated });
+  } catch (error) {
+    const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+    if (code === "P2002") {
+      return NextResponse.json({ error: "Ese WhatsApp ya está cargado en otro agente" }, { status: 409 });
+    }
+    throw error;
+  }
 }

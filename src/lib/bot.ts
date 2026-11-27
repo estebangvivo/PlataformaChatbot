@@ -22,6 +22,7 @@ import {
   isOnlyGreeting,
   type ContactProfile,
 } from "./personality";
+import { findInternalAgentPhone } from "./agent-notify";
 
 async function upsertConversation(phone: string, name?: string, channel: "whatsapp" | "simulator" = "whatsapp") {
   const existing = await prisma.conversation.findUnique({
@@ -146,6 +147,14 @@ export async function handleInboundWhatsApp(params: {
   channel?: "whatsapp" | "simulator";
   media?: InboundMedia;
 }) {
+  if (params.channel !== "simulator") {
+    const internal = await findInternalAgentPhone(params.phone);
+    if (internal) {
+      console.info("[r5] inbound de WhatsApp interno de agente, ignorado");
+      return { conversationId: null, autoReplied: false, ignored: true };
+    }
+  }
+
   let conversation = await upsertConversation(params.phone, params.name, params.channel);
 
   let userText = params.text.trim();

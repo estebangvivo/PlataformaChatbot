@@ -3,6 +3,7 @@ import { parseJson, normalizeText } from "./utils";
 import { parseHours, isWithinHours } from "./hours";
 import { emitDeskNotify, hub } from "./events";
 import { DESK_EVENT, logDeskEvent } from "./desk-log";
+import { notifyAgentByWhatsApp } from "./agent-notify";
 
 type Rule = {
   id: string;
@@ -176,6 +177,15 @@ export async function assignToAgent(
     actorUserId,
   );
 
+  void notifyAgentByWhatsApp({
+    agentUserId,
+    conversationId,
+    contactName: conversation.userName,
+    actorUserId,
+    channel: conversation.channel,
+    agentOnline: isDeskUserOnline(user),
+  });
+
   return {
     conversation,
     agent: profile,
@@ -226,41 +236,10 @@ export async function requestHandoff(
     return { conversation, agent: null };
   }
 
-  const updated = await prisma.conversation.update({
-    where: { id: conversationId },
-    data: {
-      status: "HUMAN",
-      assignedAgentId: agent.userId,
-      lastIntent: reason,
-      botEnabled: false,
-      ...(conversation.assignedAt ? {} : { assignedAt: new Date() }),
-    },
-  });
-
-  hub.emitEvent({
-    type: "conversation.assigned",
-    payload: { conversationId, department: opts?.department, assignedAgentId: updated.assignedAgentId },
-  });
-  await logDeskEvent({
-    type: agent ? DESK_EVENT.assigned : DESK_EVENT.pending,
-    conversationId,
-    fromAgentId: conversation.assignedAgentId,
-    toAgentId: updated.assignedAgentId,
-    department: agent?.department ?? opts?.department,
-    intent: reason,
-    source: "bot",
-  });
-  if (updated.assignedAgentId) {
-    emitDeskNotify({
-      agentUserId: updated.assignedAgentId,
-      conversationId,
-      title: "Te derivaron un chat",
-      body: `${updated.userName ?? "Un matriculado"} espera tu atención.`,
-      kind: "assign",
-    });
-  }
-
-  return { conversation: updated, agent };
+  const assigned = await assignToAgent(conversationId, agent.userId, reason);
+  return assigned
+    ? { conversation: assigned.conversation, agent: assigned.agent }
+    : { conversation, agent: null };
 }
 
 export const HANDOFF_PHRASES = [

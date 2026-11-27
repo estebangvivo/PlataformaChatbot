@@ -15,6 +15,76 @@ export function isWhatsAppConfigured() {
   return Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
 }
 
+export function normalizeWhatsAppPhone(raw: string) {
+  let digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.length < 8) return null;
+  if (digits.startsWith("549") && digits.length >= 12) return digits;
+  if (digits.startsWith("54") && !digits.startsWith("549") && digits.length >= 11) {
+    return `549${digits.slice(2)}`;
+  }
+  if (digits.startsWith("9") && digits.length >= 11) return `54${digits}`;
+  if (digits.length === 10 || digits.length === 11) return `549${digits.replace(/^0/, "")}`;
+  if (digits.length >= 12) return digits;
+  return `549${digits}`;
+}
+
+export function phonesMatch(a: string, b: string) {
+  const da = a.replace(/\D/g, "");
+  const db = b.replace(/\D/g, "");
+  if (!da || !db) return false;
+  if (da === db) return true;
+  const tailA = da.slice(-10);
+  const tailB = db.slice(-10);
+  return tailA.length === 10 && tailA === tailB;
+}
+
+export async function sendWhatsAppTemplate(
+  to: string,
+  name: string,
+  language: string,
+  bodyParams: string[],
+) {
+  if (!isWhatsAppConfigured()) {
+    console.info("[r5] plantilla WA (simulada):", to, name, bodyParams);
+    return { ok: true, simulated: true as const };
+  }
+
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID!;
+  const components =
+    bodyParams.length > 0
+      ? [
+          {
+            type: "body",
+            parameters: bodyParams.map((text) => ({ type: "text", text: text.slice(0, 60) })),
+          },
+        ]
+      : [];
+
+  const res = await fetch(`${GRAPH}/${phoneId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to: to.replace(/\D/g, ""),
+      type: "template",
+      template: {
+        name,
+        language: { code: language },
+        components,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`WhatsApp template: ${await res.text()}`);
+  }
+  return { ok: true, simulated: false as const, data: await res.json() };
+}
+
 export async function sendWhatsAppText(to: string, body: string) {
   if (!isWhatsAppConfigured()) {
     return { ok: true, simulated: true as const };
